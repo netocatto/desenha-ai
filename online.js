@@ -277,10 +277,15 @@
         try { history.replaceState(null, '', '?sala=' + code); } catch { }
         watch();
       }
-      if (!code) return resp(400, { error: 'Sem código de sala' });
+      if (!code) {
+        // sem código: um jogador guardado de outra partida não vale mais → volta para a tela de entrada
+        if (path === '/api/state' || path === '/api/action') return resp(404, { error: 'jogador desconhecido' });
+        return resp(400, { error: 'Digite o código da sala (aparece na TV)' });
+      }
       const inbox = 'salas/' + code + '/inbox';
       if (path === '/api/state') {
         if (lastX && lastX.indexOf('unknown') === 0) return resp(404, { error: 'jogador desconhecido' });
+        if (hostKnown && !host) return resp(404, { error: 'jogador desconhecido' });   // a sala acabou
         return lastView ? resp(200, lastView) : resp(204, null);
       }
       if (path === '/api/draw') { db.push(inbox, { uid: db.uid, tipo: 'draw', corpo }); return resp(204, null); }

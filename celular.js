@@ -33,7 +33,7 @@ async function poll() {
     const j = await r.json().catch(() => null);
     if (r.status === 404 && j && j.error === 'jogador desconhecido') return forget();
     if (r.ok && j) { setStatus(''); onState(j); }
-    else if (r.status !== 204) setStatus('servidor desatualizado? feche e abra o iniciar.bat');
+    else if (r.status !== 204) setStatus('reconectando…');
   } catch (e) { setStatus('reconectando…'); }
 }
 setInterval(() => { if (pid && Date.now() - sseAlive > 6000) poll(); }, 900);
