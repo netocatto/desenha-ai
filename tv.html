@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Desenha Aí! — TV (online)</title>
-<script src="qrcode.js?v=202611050933"></script>
+<script src="qrcode.js?v=202611050943"></script>
 <style>
   @font-face { font-family: 'Baloo 2'; src: url('fonts/Baloo2.ttf') format('truetype'); font-weight: 400 800; font-display: swap; }
   :root { --bg: #1b1440; --bg2: #271d5c; --card: #2f2470; --ink: #fff; --muted: #b9b0e6;
@@ -61,6 +61,10 @@
   .scores div { display: flex; justify-content: space-between; font-size: 2.3vh; font-weight: 800; background: var(--bg2); padding: .5vh 1.8vh; border-radius: 1.4vh; }
   .scores div.dr { outline: .35vh solid var(--pink); }
   .scores .tries { color: var(--muted); font-size: 2vh; margin-left: 1vh; }
+  .scores.many { display: grid; grid-template-columns: 1fr 1fr; gap: .6vh; }
+  .scores.many div { font-size: 1.8vh; padding: .35vh 1vh; }
+  .scores.many div span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: .6vh; }
+  .scores.many .tries { font-size: 1.5vh; margin-left: .4vh; }
   .buzzBanner { position: absolute; left: 50%; top: 5vh; transform: translateX(-50%); background: var(--yellow); color: #1b1440; font-weight: 800;
     font-size: 6vh; padding: 1.6vh 5vh; border-radius: 999px; box-shadow: 0 1.2vh 0 #b38f10; display: none; white-space: nowrap; z-index: 4; }
   .buzzBanner.on { display: block; animation: drop .35s cubic-bezier(.3,1.6,.6,1); }
@@ -123,7 +127,7 @@
   </div>
   <div class="side">
     <div class="logo"><span class="a">Desenha</span> <span class="b">Aí!</span></div>
-    <div class="info"><div class="k" id="roundLbl">Rodada</div><div class="v">✏️ <span id="drawerName"></span></div></div>
+    <div class="info"><div class="k" id="roundLbl">Rodada</div><div class="v">✏️ <span id="drawerName"></span></div><div class="k" id="nextName" style="margin-top:.4vh;text-transform:none;letter-spacing:0;font-size:1.9vh"></div></div>
     <div class="info"><div class="k" id="catLbl">Categoria</div><div class="mask" id="mask"></div></div>
     <div class="info" style="display:flex;align-items:center;justify-content:space-between"><div class="k">Tempo</div><div class="timer" id="timer">--</div></div>
     <div class="scores" id="scores"></div>
@@ -140,10 +144,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=202611050933"></script>
-<script src="palavras.js?v=202611050933"></script>
-<script src="core.js?v=202611050933"></script>
-<script src="online.js?v=202611050933"></script>
-<script src="tv.js?v=202611050933"></script>
+<script src="firebase-config.js?v=202611050943"></script>
+<script src="palavras.js?v=202611050943"></script>
+<script src="core.js?v=202611050943"></script>
+<script src="online.js?v=202611050943"></script>
+<script src="tv.js?v=202611050943"></script>
 </body>
 </html>

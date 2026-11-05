@@ -199,10 +199,12 @@ function renderGame(s, prev) {
   show('s-game');
   $('roundLbl').textContent = `Rodada ${s.round}/${s.totalRounds} · vez ${s.turn}/${s.turnsInRound}`;
   $('drawerName').textContent = s.drawerName || '';
+  $('nextName').textContent = s.nextName ? 'depois: ' + s.nextName : '';
   $('catLbl').textContent = s.category ? `Categoria: ${s.category}` : 'Categoria';
   $('mask').textContent = s.mask ? s.mask.split(' ').map(w => w.split('').join(' ')).join('     ') : '';
 
   const sc = $('scores'); sc.innerHTML = '';
+  sc.classList.toggle('many', s.players.length > 8);
   [...s.players].sort((a, b) => b.score - a.score).forEach(p => {
     const d = document.createElement('div'); if (p.pid === s.drawerId) d.className = 'dr';
     const tries = (p.pid !== s.drawerId && s.phase === 'drawing' && p.attemptsUsed) ? `<span class="tries">${'✖'.repeat(p.attemptsUsed)}</span>` : '';

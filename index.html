@@ -55,6 +55,10 @@
   .topbar { display: flex; align-items: center; gap: 8px; }
   .topbar .wordmini { flex: 1; background: var(--card); border-radius: 12px; padding: 4px 10px; font-weight: 800; font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .topbar .wordmini small { color: var(--muted); font-weight: 700; font-size: 12px; display: block; line-height: 1; margin-top: 2px; }
+  .eyeBig { color: var(--ink); font-size: 18px; border-color: var(--cyan); }
+  .eyeMini { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 12px; border: 2px solid var(--card); background: var(--bg2); font-size: 20px; padding: 0; }
+  .eyeMini.on { background: var(--cyan); border-color: var(--cyan); }
+  .wordcard .w.hid { letter-spacing: 6px; color: #b9b0e6; }
   .timer { background: var(--yellow); color: #1b1440; font-weight: 800; font-size: 24px; border-radius: 12px; padding: 2px 12px; min-width: 70px; text-align: center; }
   .timer.low { background: var(--red); color: #fff; }
   .timer.paused { background: var(--cyan); }
@@ -115,7 +119,7 @@
   <div class="grow">
     <h1 class="center"><span class="a">Desenha</span> <span class="b">Aí!</span></h1>
     <p class="center muted" style="margin:0">Digite seu nome para entrar na sala</p>
-    <p class="center muted" style="margin:0;font-size:11px;opacity:.6">versão 7 · online 0933</p>
+    <p class="center muted" style="margin:0;font-size:11px;opacity:.6">versão 8</p>
     <input type="text" id="sala" maxlength="6" placeholder="Código da sala (ex.: K7P2)" autocomplete="off" style="text-transform:uppercase;display:none">
     <input type="text" id="name" maxlength="16" placeholder="Seu nome" autocomplete="off" enterkeyhint="go">
     <div class="err" id="joinErr"></div>
@@ -150,6 +154,7 @@
   <div class="grow">
     <p class="center muted" style="margin:0">Sua vez! Não mostre para ninguém 🤫</p>
     <div class="wordcard"><div class="cat" id="wCat"></div><div class="w" id="wWord"></div></div>
+    <button class="btn ghost eyeBig" id="eyeBtn">👁 Mostrar palavra</button>
     <button class="btn pink" id="beginBtn">✏️ Começar a desenhar</button>
     <button class="btn ghost" id="swapBtn">🔄 Trocar palavra (1 vez)</button>
   </div>
@@ -159,6 +164,7 @@
 <section class="screen" id="s-draw">
   <div class="topbar">
     <div class="wordmini" id="miniWord"></div>
+    <button class="eyeMini" id="miniEye" aria-label="Mostrar ou ocultar a palavra">👁</button>
     <div class="timer" id="drawTimer">--</div>
   </div>
   <div class="canvasWrap" id="canvasWrap"><canvas id="pad"></canvas></div>
@@ -214,9 +220,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=202611050933"></script>
-<script src="online.js?v=202611050933"></script>
+<script src="firebase-config.js?v=202611050943"></script>
+<script src="online.js?v=202611050943"></script>
 <script>if (!new URLSearchParams(location.search).get("sala")) document.addEventListener("DOMContentLoaded", function () { document.getElementById("sala").style.display = ""; });</script>
-<script src="celular.js?v=202611050933"></script>
+<script src="celular.js?v=202611050943"></script>
 </body>
 </html>

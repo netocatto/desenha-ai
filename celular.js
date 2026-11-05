@@ -152,10 +152,32 @@ function renderLobby(s) {
 $('startBtn').onclick = () => api('start');
 
 // ---------- palavra ----------
+// palavra começa oculta: o desenhista só mostra quando estiver "seguro"
+let wordVisible = false, wordTurnKey = null;
+function syncWordVisibility(s) {
+  const key = s.round + '|' + s.turn + '|' + s.drawerId;
+  if (key !== wordTurnKey) { wordTurnKey = key; wordVisible = false; }
+}
+function hiddenWord(w) { return '•'.repeat(Math.min(Math.max(String(w || '').length, 4), 10)); }
+function paintWord() {
+  if (!S || !S.word) return;
+  const w = $('wWord');
+  w.textContent = wordVisible ? S.word : hiddenWord(S.word);
+  w.classList.toggle('hid', !wordVisible);
+  $('eyeBtn').textContent = wordVisible ? '🙈 Ocultar palavra' : '👁 Mostrar palavra';
+  $('miniWord').innerHTML = `${wordVisible ? esc(S.word) : '<span style="letter-spacing:3px;color:var(--muted)">' + hiddenWord(S.word) + '</span>'}<small>${esc(S.category)} · rodada ${S.round}/${S.totalRounds}</small>`;
+  $('miniEye').classList.toggle('on', wordVisible);
+  $('miniEye').textContent = wordVisible ? '🙈' : '👁';
+}
+function toggleWord() { wordVisible = !wordVisible; paintWord(); }
+$('eyeBtn').onclick = toggleWord;
+$('miniEye').onclick = toggleWord;
+
 function renderWord(s) {
   show('s-word');
+  syncWordVisibility(s);
   $('wCat').textContent = s.category;
-  $('wWord').textContent = s.word;
+  paintWord();
   $('swapBtn').style.display = s.canSwap ? '' : 'none';
 }
 $('beginBtn').onclick = () => api('beginDraw');
@@ -283,7 +305,8 @@ setInterval(flush, 40);
 
 function renderDraw(s, prev) {
   show('s-draw');
-  $('miniWord').innerHTML = `${esc(s.word)}<small>${esc(s.category)} · rodada ${s.round}/${s.totalRounds}</small>`;
+  syncWordVisibility(s);
+  paintWord();
   const j = $('judge');
   if (s.buzz) {
     $('judgeWho').textContent = `🙋 ${s.buzz.name} vai responder!`;

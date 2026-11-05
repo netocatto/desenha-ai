@@ -9,7 +9,8 @@
 })(this, function () {
   'use strict';
 
-  const REVEAL_MS = 7000;       // tempo mostrando a resposta antes do próximo
+  const REVEAL_MS = 7000;
+  const MAX_JOGADORES = 15;       // tempo mostrando a resposta antes do próximo
   const PTS_ACERTO = 10;        // pontos de quem adivinha
   const PTS_DESENHISTA = 5;     // pontos de quem desenhou
 
@@ -59,7 +60,7 @@
     const game = {
       phase: 'lobby',            // lobby | word | drawing | reveal | end
       settings: { rounds: 2, attempts: 3, time: 90, music: true, categories: Object.keys(CATEGORIAS) },
-      round: 0, drawOrder: [], turnIndex: 0,
+      round: 0, drawOrder: [], matchOrder: [], turnIndex: 0,
       drawerId: null, word: null, category: null, swapped: false,
       endsAt: null, pausedRemaining: null,
       buzz: null, attemptsUsed: {}, strokes: [],
@@ -105,7 +106,8 @@
         allCategories: Object.keys(CATEGORIAS).map(key => ({ key, name: CATEGORIAS[key].nome, count: CATEGORIAS[key].palavras.length })),
         round: game.round, totalRounds: game.settings.rounds,
         turn: game.turnIndex + 1, turnsInRound: game.drawOrder.length,
-        drawerId: game.drawerId, drawerName: nameOf(game.drawerId),
+        drawerId: game.drawerId, drawerName: nameOf(game.drawerId), nextName: nextDrawerName(),
+        maxPlayers: MAX_JOGADORES,
         category: game.category ? CATEGORIAS[game.category].nome : null,
         mask: game.word ? mask(game.word) : null,
         remainingMs: remainingMs(),
@@ -145,14 +147,29 @@
 
     // ---------------- fluxo ----------------
     function clearTimer() { if (timer) { clearTimeout(timer); timer = null; } }
+    function shuffle(a) {
+      for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
+      return a;
+    }
     function startGame() {
       players.forEach(p => { p.score = 0; });
       game.round = 0; game.used.clear();
+      game.matchOrder = shuffle(order.slice());          // ordem sorteada, vale para todas as rodadas
       startRound();
     }
     function startRound() {
-      game.round += 1; game.drawOrder = order.slice(); game.turnIndex = 0;
+      game.round += 1;
+      // quem entrou no meio da partida desenha no fim da fila, a partir desta rodada
+      order.forEach(p => { if (game.matchOrder.indexOf(p) < 0) game.matchOrder.push(p); });
+      game.matchOrder = game.matchOrder.filter(p => players.has(p));
+      game.drawOrder = game.matchOrder.slice(); game.turnIndex = 0;
       startTurn();
+    }
+    function nextDrawerName() {
+      if (game.phase === 'lobby' || game.phase === 'end') return null;
+      for (let i = game.turnIndex + 1; i < game.drawOrder.length; i++) if (players.has(game.drawOrder[i])) return nameOf(game.drawOrder[i]);
+      if (game.round < game.settings.rounds) { const f = game.matchOrder.find(p => players.has(p)); return f ? nameOf(f) : null; }
+      return null;
     }
     function startTurn() {
       clearTimer();
@@ -359,6 +376,7 @@
           let taken = false;
           players.forEach(x => { if (x.name.toLowerCase() === name.toLowerCase()) taken = true; });
           if (taken) return [409, { error: 'Esse nome já está em uso' }];
+          if (players.size >= MAX_JOGADORES) return [403, { error: 'Sala cheia: o máximo é ' + MAX_JOGADORES + ' jogadores' }];
           // versão online: o transporte fixa o id do jogador (= conta anônima do Firebase)
           const pid = (b.pidFixo && !players.has(String(b.pidFixo))) ? String(b.pidFixo) : newId();
           pl = { pid, name, score: 0, conns: 0 };
