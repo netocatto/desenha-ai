@@ -140,6 +140,21 @@ function updateMusic() { Music.set(musicMode(S), urgency); }
 const es = new EventSource('/events?role=tv');
 es.addEventListener('state', (e) => onState(JSON.parse(e.data)));
 es.addEventListener('strokes', (e) => { strokes = JSON.parse(e.data); redraw(); });
+es.addEventListener('avatars', (e) => {
+  AV = JSON.parse(e.data) || {};
+  if (!S) return;                                  // só redesenha (sem mexer no relógio nem nos sons)
+  if (S.phase === 'lobby') renderLobby(S, S); else if (S.phase === 'end') renderEnd(S); else renderGame(S, S);
+});
+
+// ---------- avatares (personagem 32 bits; sem avatar = inicial colorida) ----------
+let AV = {};
+const AV_COLORS = ['#ff5d8f', '#3ddbd9', '#ffd23f', '#3ee08f', '#a78bfa', '#fb923c', '#60a5fa'];
+function avColor(pid) { let h = 0; for (const ch of String(pid)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return AV_COLORS[h % AV_COLORS.length]; }
+function avatarHTML(pid, name, cls) {
+  if (AV[pid]) return `<img class="av ${cls || ''}" src="${AV[pid]}" alt="">`;
+  return `<span class="av ini ${cls || ''}" style="background:${avColor(pid)}">${esc(String(name || '?').charAt(0).toUpperCase())}</span>`;
+}
+function playerById(pid) { return S && S.players.find(p => p.pid === pid); }
 es.addEventListener('draw', (e) => applyOps(JSON.parse(e.data)));
 es.addEventListener('buzz', () => SFX.buzz());
 es.addEventListener('wrong', () => { SFX.wrong(); const f = $('flash'); f.className = 'flash'; void f.offsetWidth; f.className = 'flash red'; });
@@ -184,7 +199,7 @@ function renderLobby(s, prev) {
   const pl = $('lobbyPlayers'); pl.innerHTML = '';
   for (const p of s.players) {
     const d = document.createElement('div'); d.className = 'p' + (p.connected ? '' : ' off');
-    d.textContent = (p.isMaster ? '👑 ' : '') + p.name; pl.appendChild(d);
+    d.innerHTML = avatarHTML(p.pid, p.name, 'big') + '<span>' + (p.isMaster ? '👑 ' : '') + esc(p.name) + '</span>'; pl.appendChild(d);
   }
   if (prev && s.players.length > prev.players.length) SFX.join();
   const st = s.settings;
@@ -198,7 +213,7 @@ function renderLobby(s, prev) {
 function renderGame(s, prev) {
   show('s-game');
   $('roundLbl').textContent = `Rodada ${s.round}/${s.totalRounds} · vez ${s.turn}/${s.turnsInRound}`;
-  $('drawerName').textContent = s.drawerName || '';
+  $('drawerName').innerHTML = s.drawerId ? avatarHTML(s.drawerId, s.drawerName, 'mid') + ' ' + esc(s.drawerName) : '';
   $('nextName').textContent = s.nextName ? 'depois: ' + s.nextName : '';
   $('catLbl').textContent = s.category ? `Categoria: ${s.category}` : 'Categoria';
   $('mask').textContent = s.mask ? s.mask.split(' ').map(w => w.split('').join(' ')).join('     ') : '';
@@ -208,15 +223,15 @@ function renderGame(s, prev) {
   [...s.players].sort((a, b) => b.score - a.score).forEach(p => {
     const d = document.createElement('div'); if (p.pid === s.drawerId) d.className = 'dr';
     const tries = (p.pid !== s.drawerId && s.phase === 'drawing' && p.attemptsUsed) ? `<span class="tries">${'✖'.repeat(p.attemptsUsed)}</span>` : '';
-    d.innerHTML = `<span>${p.pid === s.drawerId ? '✏️ ' : ''}${esc(p.name)}${tries}</span><span>${p.score}</span>`;
+    d.innerHTML = `<span>${avatarHTML(p.pid, p.name)} ${p.pid === s.drawerId ? '✏️ ' : ''}${esc(p.name)}${tries}</span><span>${p.score}</span>`;
     sc.appendChild(d);
   });
 
   $('ovWord').classList.toggle('on', s.phase === 'word');
-  $('ovWordText').textContent = `✏️ ${s.drawerName} está vendo a palavra…`;
+  $('ovWordText').innerHTML = s.drawerId ? `${avatarHTML(s.drawerId, s.drawerName, 'hero')}<br>✏️ ${esc(s.drawerName)} está vendo a palavra…` : '';
 
   const bb = $('buzzBanner');
-  if (s.buzz && s.phase === 'drawing') { bb.textContent = `🙋 ${s.buzz.name} vai responder!`; bb.classList.add('on'); }
+  if (s.buzz && s.phase === 'drawing') { bb.innerHTML = `${avatarHTML(s.buzz.pid, s.buzz.name)} 🙋 ${esc(s.buzz.name)} vai responder!`; bb.classList.add('on'); }
   else bb.classList.remove('on');
 
   const rv = $('ovReveal');
@@ -224,7 +239,7 @@ function renderGame(s, prev) {
     const r = s.lastResult;
     $('rvCat').textContent = r.category; $('rvWord').textContent = r.word;
     const reasons = { tempo: '⏰ Tempo esgotado!', tentativas: '😬 Acabaram as tentativas', desistiu: '🏳️ Desenho encerrado', pulado: '⏭ Vez pulada' };
-    $('rvText').textContent = r.winnerId ? `🎉 ${r.winnerName} acertou! +10 · ${r.drawerName} +5` : (reasons[r.reason] || 'Ninguém acertou');
+    $('rvText').innerHTML = r.winnerId ? `${avatarHTML(r.winnerId, r.winnerName, 'hero')}<br>🎉 ${esc(r.winnerName)} acertou! +10 · ${esc(r.drawerName)} +5` : esc(reasons[r.reason] || 'Ninguém acertou');
     if (!prev || prev.phase !== 'reveal') r.winnerId ? SFX.right() : SFX.timeup();
     rv.classList.add('on');
   } else rv.classList.remove('on');
@@ -280,7 +295,7 @@ function renderEnd(s) {
   const sorted = [...s.players].sort((a, b) => b.score - a.score);
   const top = [sorted[1], sorted[0], sorted[2]];
   const H = [22, 32, 15], C = ['#c9c9e8', '#ffd23f', '#e0a36b'], N = [2, 1, 3];
-  $('podium').innerHTML = top.map((p, i) => p ? `<div class="col"><div class="nm">${i === 1 ? '🏆 ' : ''}${esc(p.name)}</div><div class="pt">${p.score} pts</div><div class="bar" style="height:${H[i]}vh;background:${C[i]}">${N[i]}º</div></div>` : '').join('');
+  $('podium').innerHTML = top.map((p, i) => p ? `<div class="col">${avatarHTML(p.pid, p.name, i === 1 ? 'podium1' : 'podium')}<div class="nm">${i === 1 ? '🏆 ' : ''}${esc(p.name)}</div><div class="pt">${p.score} pts</div><div class="bar" style="height:${H[i]}vh;background:${C[i]}">${N[i]}º</div></div>` : '').join('');
   $('rest').textContent = sorted.slice(3).map((p, i) => `${i + 4}º ${p.name} (${p.score})`).join(' · ');
 }
 

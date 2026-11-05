@@ -51,12 +51,45 @@ async function api(type, extra = {}) {
 
 // ---------- entrar ----------
 $('name').value = LS.get('da_name') || '';
+// ---------- avatar ----------
+let avChoice = LS.get('da_avc') || '';            // 'm' | 'f' | 'none' | '' (ainda não escolheu)
+let myAvatar = LS.get('da_avatar') || null;
+function paintAvatarChoice() {
+  document.querySelectorAll('#avOpts button').forEach(b => b.classList.toggle('sel', b.dataset.av === avChoice));
+  const has = (avChoice === 'm' || avChoice === 'f') && myAvatar;
+  $('avMine').hidden = !has;
+  if (has) $('avPrev').src = myAvatar;
+}
+async function takeAvatar(g) {
+  if (!window.Avatar) return null;
+  const url = await Avatar.open(g);
+  if (url) { myAvatar = url; LS.set('da_avatar', url); avChoice = g; LS.set('da_avc', g); }
+  paintAvatarChoice();
+  return url;
+}
+document.querySelectorAll('#avOpts button').forEach(b => b.onclick = async () => {
+  const g = b.dataset.av;
+  if (g === 'none') { avChoice = 'none'; LS.set('da_avc', 'none'); paintAvatarChoice(); return; }
+  const prev = avChoice; avChoice = g; paintAvatarChoice();
+  const url = await takeAvatar(g);
+  if (!url) { avChoice = prev; paintAvatarChoice(); }
+});
+$('avRedo').onclick = () => takeAvatar(avChoice === 'f' ? 'f' : 'm');
+async function lobbyAvatar(g) {
+  $('avLobbyPick').hidden = true;
+  const url = await takeAvatar(g);
+  if (url) api('avatar', { avatar: url });
+}
+$('avLobby').onclick = () => { $('avLobbyPick').hidden = !$('avLobbyPick').hidden; };
+document.querySelectorAll('#avLobbyPick button').forEach(b => b.onclick = () => lobbyAvatar(b.dataset.av));
+paintAvatarChoice();
+
 async function join() {
   const name = $('name').value.trim();
   if (!name) { $('joinErr').textContent = 'Digite seu nome'; return; }
   $('joinBtn').disabled = true;
   try {
-    const r = await fetch('/api/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, pid }) });
+    const r = await fetch('/api/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, pid, avatar: (avChoice === 'm' || avChoice === 'f') ? myAvatar : null }) });
     const j = await r.json();
     if (!r.ok) { $('joinErr').textContent = j.error || 'Erro'; return; }
     pid = j.pid; LS.set('da_pid', pid); LS.set('da_name', name);
@@ -122,6 +155,7 @@ function renderLobby(s) {
     const d = document.createElement('div');
     d.className = 'chipP' + (p.connected ? '' : ' off');
     d.textContent = (p.isMaster ? '👑 ' : '') + p.name + (p.pid === s.me.pid ? ' (você)' : '');
+    if (p.pid === s.me.pid && myAvatar && (avChoice === 'm' || avChoice === 'f')) { const im = document.createElement('img'); im.src = myAvatar; d.prepend(im); }
     if (s.me.isMaster && !p.isMaster) {
       const x = document.createElement('button'); x.className = 'x'; x.textContent = '×';
       x.onclick = () => api('kick', { pid: p.pid }); d.appendChild(x);

@@ -35,7 +35,12 @@
   .err { color: var(--red); min-height: 1.2em; font-weight: 700; }
   .players { display: flex; flex-wrap: wrap; gap: 8px; }
   .chipP { background: var(--bg2); border-radius: 999px; padding: 4px 12px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
-  .chipP.off { opacity: .45; } .chipP .x { background: var(--red); color: #fff; border: 0; border-radius: 50%; width: 22px; height: 22px; font-weight: 800; line-height: 1; padding: 0; }
+  .chipP.off { opacity: .45; }
+  .chipP img { width: 26px; height: 26px; image-rendering: pixelated; border-radius: 6px; background: #2f2470; }
+  .avPick { background: var(--card); border-radius: 16px; padding: 12px; }
+  .avMine { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+  .avMine[hidden], #avLobbyPick[hidden] { display: none; }
+  .avMine img { width: 72px; height: 72px; image-rendering: pixelated; border-radius: 12px; background: #1b1440; } .chipP .x { background: var(--red); color: #fff; border: 0; border-radius: 50%; width: 22px; height: 22px; font-weight: 800; line-height: 1; padding: 0; }
   .opt { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
   .opt button { font: inherit; font-weight: 700; font-size: 17px; border: 2px solid #4a3d96; background: transparent; color: var(--ink);
     border-radius: 12px; padding: 6px 14px; min-width: 48px; }
@@ -119,9 +124,14 @@
   <div class="grow">
     <h1 class="center"><span class="a">Desenha</span> <span class="b">Aí!</span></h1>
     <p class="center muted" style="margin:0">Digite seu nome para entrar na sala</p>
-    <p class="center muted" style="margin:0;font-size:11px;opacity:.6">versão 8</p>
+    <p class="center muted" style="margin:0;font-size:11px;opacity:.6">versão 9</p>
     <input type="text" id="sala" maxlength="6" placeholder="Código da sala (ex.: K7P2)" autocomplete="off" style="text-transform:uppercase;display:none">
     <input type="text" id="name" maxlength="16" placeholder="Seu nome" autocomplete="off" enterkeyhint="go">
+    <div class="avPick">
+      <div class="lbl" style="margin:0 0 6px">Avatar (selfie vira personagem 32 bits)</div>
+      <div class="opt" id="avOpts" style="margin:0"><button data-av="m">👨 Homem</button><button data-av="f">👩 Mulher</button><button data-av="none">🚫 Sem avatar</button></div>
+      <div class="avMine" id="avMine" hidden><img id="avPrev" alt="seu avatar"><button class="btn ghost" id="avRedo" style="width:auto;padding:6px 12px">↺ Tirar outra</button></div>
+    </div>
     <div class="err" id="joinErr"></div>
     <button class="btn" id="joinBtn">Entrar ▶</button>
   </div>
@@ -133,6 +143,8 @@
   <div class="card">
     <div class="lbl">Na sala (<span id="pCount">0</span>)</div>
     <div class="players" id="lobbyPlayers" style="margin-top:6px"></div>
+    <button class="btn ghost" id="avLobby" style="margin-top:10px;font-size:15px">📸 Criar / trocar meu avatar</button>
+    <div class="opt" id="avLobbyPick" hidden style="margin-top:8px"><button data-av="m">👨 Homem</button><button data-av="f">👩 Mulher</button></div>
   </div>
   <div class="card" id="masterPanel">
     <h2>👑 Você é o mestre</h2>
@@ -217,12 +229,13 @@
   </div>
 </section>
 
+<script src="avatar.js?v=202611051218"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=202611050943"></script>
-<script src="online.js?v=202611050943"></script>
+<script src="firebase-config.js?v=202611051218"></script>
+<script src="online.js?v=202611051218"></script>
 <script>if (!new URLSearchParams(location.search).get("sala")) document.addEventListener("DOMContentLoaded", function () { document.getElementById("sala").style.display = ""; });</script>
-<script src="celular.js?v=202611050943"></script>
+<script src="celular.js?v=202611051218"></script>
 </body>
 </html>

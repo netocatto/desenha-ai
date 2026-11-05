@@ -90,6 +90,10 @@
       return Math.max(0, game.endsAt - Date.now());
     }
     function mask(word) { return word.split('').map(ch => (ch === ' ' || ch === '-') ? ch : '_').join(''); }
+    // avatar: imagem PNG pequena (32x32) em data URL; vai só para a TV
+    function validAvatar(a) { return typeof a === 'string' && a.indexOf('data:image/png;base64,') === 0 && a.length < 9000 ? a : null; }
+    function avatarsMap() { const m = {}; players.forEach(p => { if (p.avatar) m[p.pid] = p.avatar; }); return m; }
+    function sendAvatars() { const m = avatarsMap(); clients.forEach(c => { if (c.role === 'tv') send(c, 'avatars', m); }); }
     function nameOf(pid) { const p = players.get(pid); return p ? p.name : null; }
 
     // ---------------- o que cada um pode ver ----------------
@@ -98,7 +102,7 @@
         phase: game.phase,
         players: order.map(pid => {
           const p = players.get(pid);
-          return { pid, name: p.name, score: p.score, connected: p.conns > 0, isMaster: pid === masterId,
+          return { pid, name: p.name, score: p.score, connected: p.conns > 0, isMaster: pid === masterId, av: !!p.avatar,
             attemptsUsed: game.attemptsUsed[pid] || 0 };
         }),
         masterId,
@@ -242,6 +246,10 @@
         case 'music':                       // o mestre liga/desliga a música a qualquer momento
           if (!isMaster) return;
           game.settings.music = !!a.on; break;
+        case 'avatar': {
+          const p = players.get(pid); if (!p) return;
+          p.avatar = validAvatar(a.avatar); sendAvatars(); break;
+        }
         case 'start':
           if (!isMaster || game.phase !== 'lobby' || order.length < 1) return;
           return startGame();
@@ -351,7 +359,7 @@
           pl.conns += 1;
         }
         clients.add(client);
-        if (client.role === 'tv') send(client, 'strokes', game.strokes);
+        if (client.role === 'tv') { send(client, 'strokes', game.strokes); send(client, 'avatars', avatarsMap()); }
         broadcastState();
         return true;
       },
@@ -383,6 +391,7 @@
           players.set(pid, pl); order.push(pid);
           if (!masterId || !players.has(masterId)) masterId = pid;
         }
+        if (b.avatar !== undefined) { pl.avatar = validAvatar(b.avatar); sendAvatars(); }
         log('→ ' + pl.name + ' entrou na sala');
         broadcastState();
         return [200, { pid: pl.pid, state: viewFor({ role: 'player', pid: pl.pid }) }];
