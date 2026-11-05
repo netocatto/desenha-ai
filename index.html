@@ -110,6 +110,12 @@
   .rank { display: flex; flex-direction: column; gap: 6px; }
   .rank div { display: flex; justify-content: space-between; background: var(--bg2); padding: 8px 14px; border-radius: 12px; font-weight: 800; font-size: 18px; }
   .rank div.me { outline: 2px solid var(--yellow); }
+  .hintBox { background: var(--card); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .hintBox[hidden] { display: none; }
+  .hintMask { font-size: 26px; font-weight: 800; letter-spacing: 2px; color: var(--yellow); white-space: pre-wrap; word-break: break-word; line-height: 1.2; }
+  .hintBtn { color: var(--ink); border-color: var(--yellow); font-size: 17px; }
+  .hintBtn:disabled { opacity: .7; border-color: var(--card); }
+  .hintDone { font-weight: 800; color: var(--yellow); font-size: 18px; }
   .masterbar { display: none; gap: 8px; }
   .masterbar.on { display: flex; }
   .masterbar .btn { font-size: 14px; padding: 8px; }
@@ -124,7 +130,7 @@
   <div class="grow">
     <h1 class="center"><span class="a">Desenha</span> <span class="b">Aí!</span></h1>
     <p class="center muted" style="margin:0">Digite seu nome para entrar na sala</p>
-    <p class="center muted" style="margin:0;font-size:11px;opacity:.6">versão 9</p>
+    <p class="center muted" style="margin:0;font-size:11px;opacity:.6">versão 10</p>
     <input type="text" id="sala" maxlength="6" placeholder="Código da sala (ex.: K7P2)" autocomplete="off" style="text-transform:uppercase;display:none">
     <input type="text" id="name" maxlength="16" placeholder="Seu nome" autocomplete="off" enterkeyhint="go">
     <div class="avPick">
@@ -204,6 +210,7 @@
 <section class="screen" id="s-guess">
   <div class="center"><span class="pill" id="gRound"></span></div>
   <div class="grow center" id="guessBody"></div>
+  <div class="hintBox center" id="hintBox" hidden></div>
   <div class="masterbar" id="mbGuess"><button class="btn ghost" data-m="skipTurn">⏭ Pular vez</button><button class="btn ghost" data-m="endGame">⏹ Encerrar partida</button><button class="btn ghost" id="musicBtn" style="flex:0 0 64px">🎵</button></div>
 </section>
 
@@ -229,13 +236,13 @@
   </div>
 </section>
 
-<script src="avatar.js?v=202611051218"></script>
+<script src="avatar.js?v=202611051839"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=202611051218"></script>
-<script src="online.js?v=202611051218"></script>
+<script src="firebase-config.js?v=202611051839"></script>
+<script src="online.js?v=202611051839"></script>
 <script>if (!new URLSearchParams(location.search).get("sala")) document.addEventListener("DOMContentLoaded", function () { document.getElementById("sala").style.display = ""; });</script>
-<script src="celular.js?v=202611051218"></script>
+<script src="celular.js?v=202611051839"></script>
 </body>
 </html>

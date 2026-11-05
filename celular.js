@@ -358,6 +358,7 @@ function renderGuess(s, prev) {
   $('mbGuess').classList.toggle('on', s.me.isMaster);
   $('musicBtn').textContent = s.settings.music === false ? '🔇' : '🎵';
   $('musicBtn').onclick = () => api('music', { on: s.settings.music === false });
+  renderHint(s);
   const body = $('guessBody');
   const left = s.me.attemptsLeft;
   if (s.phase === 'word') {
@@ -379,6 +380,22 @@ function renderGuess(s, prev) {
   }
   body.innerHTML = `<button class="buzzer" id="buzzBtn">EU SEI!<small>${left === null ? 'tentativas sem limite' : left + ' tentativa' + (left > 1 ? 's' : '')}</small></button><p class="muted">O primeiro a apertar responde</p>`;
   $('buzzBtn').onclick = () => { $('buzzBtn').disabled = true; api('buzz'); };
+}
+// palavra escondida + quantidade de letras + botão de dica (todos precisam pedir)
+function renderHint(s) {
+  const box = $('hintBox');
+  if (s.phase !== 'drawing' || !s.mask) { box.hidden = true; return; }
+  box.hidden = false;
+  const maskTxt = s.mask.split(' ').map(w => w.split('').join(' ')).join('   ');
+  const cnt = `${s.letters} letras` + (s.words > 1 ? ` · ${s.words} palavras` : '');
+  const h = s.hint || { votes: 0, needed: 0, used: false };
+  let btn;
+  if (h.used) btn = `<div class="hintDone">💡 Dica liberada!</div>`;
+  else if (s.me.hintVoted) btn = `<button class="btn ghost hintBtn" disabled>💡 Você pediu dica · ${h.votes}/${h.needed}</button>`;
+  else btn = `<button class="btn ghost hintBtn" id="hintBtn">💡 Pedir dica · ${h.votes}/${h.needed}</button>`;
+  box.innerHTML = `<div class="hintMask">${esc(maskTxt)}</div><div class="muted" style="font-weight:700">🔤 ${cnt} · ${esc(s.category || '')}</div>${btn}
+    ${!h.used ? '<div class="muted" style="font-size:13px">Quando todos pedirem, aparecem 1 ou 2 letras</div>' : ''}`;
+  const b = $('hintBtn'); if (b) b.onclick = () => { b.disabled = true; api('hint'); };
 }
 document.querySelectorAll('[data-m]').forEach(b => {
   let armed = 0; const orig = b.textContent;

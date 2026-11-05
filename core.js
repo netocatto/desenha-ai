@@ -64,6 +64,7 @@
       drawerId: null, word: null, category: null, swapped: false,
       endsAt: null, pausedRemaining: null,
       buzz: null, attemptsUsed: {}, strokes: [],
+      hintVotes: [], revealed: [], hintUsed: false,
       lastResult: null, revealUntil: null, used: new Set(),
     };
 
@@ -89,7 +90,28 @@
       if (game.endsAt == null) return null;
       return Math.max(0, game.endsAt - Date.now());
     }
-    function mask(word) { return word.split('').map(ch => (ch === ' ' || ch === '-') ? ch : '_').join(''); }
+    // máscara da palavra: letras escondidas como '_', exceto as reveladas pela dica
+    function mask(word) { return word.split('').map((ch, i) => (ch === ' ' || ch === '-') ? ch : (game.revealed.indexOf(i) >= 0 ? ch.toUpperCase() : '_')).join(''); }
+    function letterCount(word) { return word.replace(/[\s-]/g, '').length; }
+    function wordCount(word) { return word.trim().split(/\s+/).length; }
+
+    // ---------------- dica por votação ----------------
+    function hintVoters() {   // quem pode votar: quem adivinha e está conectado
+      return guessers().filter(pid => { const p = players.get(pid); return p && p.conns > 0; });
+    }
+    function checkHint() {
+      if (game.phase !== 'drawing' || game.hintUsed || !game.word) return false;
+      const voters = hintVoters();
+      if (!voters.length || !voters.every(pid => game.hintVotes.indexOf(pid) >= 0)) return false;
+      // todos pediram: revela 1 letra (palavra curta) ou 2 (palavra longa)
+      const idx = [];
+      game.word.split('').forEach((ch, i) => { if (ch !== ' ' && ch !== '-') idx.push(i); });
+      const n = Math.min(idx.length - 1, letterCount(game.word) <= 6 ? 1 : 2);
+      for (let k = 0; k < n; k++) { const j = Math.floor(Math.random() * idx.length); game.revealed.push(idx.splice(j, 1)[0]); }
+      game.hintUsed = true;
+      broadcastTV('hint', { letters: n });
+      return true;
+    }
     // avatar: imagem PNG pequena (32x32) em data URL; vai só para a TV
     function validAvatar(a) { return typeof a === 'string' && a.indexOf('data:image/png;base64,') === 0 && a.length < 9000 ? a : null; }
     function avatarsMap() { const m = {}; players.forEach(p => { if (p.avatar) m[p.pid] = p.avatar; }); return m; }
@@ -114,6 +136,9 @@
         maxPlayers: MAX_JOGADORES,
         category: game.category ? CATEGORIAS[game.category].nome : null,
         mask: game.word ? mask(game.word) : null,
+        letters: game.word ? letterCount(game.word) : null,
+        words: game.word ? wordCount(game.word) : null,
+        hint: game.phase === 'drawing' ? { votes: game.hintVotes.length, needed: hintVoters().length, used: game.hintUsed } : null,
         remainingMs: remainingMs(),
         timerRunning: game.phase === 'drawing' && game.pausedRemaining == null && game.endsAt != null,
         buzz: game.buzz ? { pid: game.buzz.pid, name: nameOf(game.buzz.pid) } : null,
@@ -134,7 +159,8 @@
         const me = players.get(client.pid);
         v.me = me ? { pid: me.pid, name: me.name, score: me.score, isMaster: me.pid === masterId,
           isDrawer: me.pid === game.drawerId,
-          attemptsLeft: game.settings.attempts === 0 ? null : game.settings.attempts - (game.attemptsUsed[me.pid] || 0) } : null;
+          attemptsLeft: game.settings.attempts === 0 ? null : game.settings.attempts - (game.attemptsUsed[me.pid] || 0),
+          hintVoted: game.hintVotes.indexOf(me.pid) >= 0 } : null;
         if (me && me.pid === game.drawerId && game.word) { v.word = game.word; v.canSwap = !game.swapped; }
       }
       return v;
@@ -182,6 +208,7 @@
       const p = pickWord();
       game.word = p.w; game.category = p.c; game.swapped = false;
       game.buzz = null; game.attemptsUsed = {}; game.strokes = [];
+      game.hintVotes = []; game.revealed = []; game.hintUsed = false;
       game.endsAt = null; game.pausedRemaining = null;
       game.lastResult = null; game.revealUntil = null;
       game.phase = 'word';
@@ -265,6 +292,11 @@
         case 'beginDraw':
           if (!isDrawer || game.phase !== 'word') return;
           return beginDrawing();
+        case 'hint':
+          if (game.phase !== 'drawing' || isDrawer || game.hintUsed) return;
+          if (game.hintVotes.indexOf(pid) < 0) game.hintVotes.push(pid);
+          checkHint();
+          break;
         case 'buzz': {
           if (game.phase !== 'drawing' || isDrawer || game.buzz) return;
           if (game.settings.attempts > 0 && (game.attemptsUsed[pid] || 0) >= game.settings.attempts) return;
@@ -368,6 +400,7 @@
         clients.delete(client);
         const pl = players.get(client.pid);
         if (client.role === 'player' && pl) pl.conns = Math.max(0, pl.conns - 1);
+        checkHint();                                  // quem saiu não trava a dica dos outros
         broadcastState();
       },
       state(pid) {

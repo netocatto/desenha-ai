@@ -32,6 +32,7 @@ const SFX = {
   timeup() { tone(440, .3, 'sawtooth'); tone(330, .5, 'sawtooth', .3); },
   tick() { tone(1200, .05, 'sine', 0, .05); },
   join() { tone(880, .08, 'triangle', 0, .06); tone(1320, .1, 'triangle', .07, .06); },
+  hint() { [1047, 1319, 1568, 2093].forEach((f, i) => tone(f, .12, 'sine', i * .07, .07)); },
 };
 // ---------- música de fundo (sintetizada na hora: sem arquivos, sem direitos autorais) ----------
 const Music = (() => {
@@ -157,6 +158,10 @@ function avatarHTML(pid, name, cls) {
 function playerById(pid) { return S && S.players.find(p => p.pid === pid); }
 es.addEventListener('draw', (e) => applyOps(JSON.parse(e.data)));
 es.addEventListener('buzz', () => SFX.buzz());
+es.addEventListener('hint', () => {
+  SFX.hint();
+  const m = $('mask'); m.classList.remove('pop'); void m.offsetWidth; m.classList.add('pop');
+});
 es.addEventListener('wrong', () => { SFX.wrong(); const f = $('flash'); f.className = 'flash'; void f.offsetWidth; f.className = 'flash red'; });
 
 function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); if (id === 's-game') resize(); }
@@ -216,7 +221,13 @@ function renderGame(s, prev) {
   $('drawerName').innerHTML = s.drawerId ? avatarHTML(s.drawerId, s.drawerName, 'mid') + ' ' + esc(s.drawerName) : '';
   $('nextName').textContent = s.nextName ? 'depois: ' + s.nextName : '';
   $('catLbl').textContent = s.category ? `Categoria: ${s.category}` : 'Categoria';
-  $('mask').textContent = s.mask ? s.mask.split(' ').map(w => w.split('').join(' ')).join('     ') : '';
+  $('mask').textContent = s.mask ? s.mask.split(' ').map(w => w.split('').join(' ')).join('   ') : '';
+  $('letters').textContent = s.letters ? `🔤 ${s.letters} letras` + (s.words > 1 ? ` · ${s.words} palavras` : '') : '';
+  const hi = $('hintInfo');
+  if (s.hint && s.hint.needed > 0) {
+    hi.textContent = s.hint.used ? '💡 Dica liberada!' : `💡 ${s.hint.votes}/${s.hint.needed} pediram dica`;
+    hi.classList.toggle('done', !!s.hint.used);
+  } else hi.textContent = '';
 
   const sc = $('scores'); sc.innerHTML = '';
   sc.classList.toggle('many', s.players.length > 8);
