@@ -68,7 +68,7 @@
         // Telefone sem fio
         tfWrite: 60, tfDraw: 90, tfGuess: 45, tfSteps: 0, tfRounds: 1,
         // Jogo das Bandeiras
-        bdFlags: 10, bdSpeed: 15, bdAttempts: 3,
+        bdFlags: 10, bdSpeed: 15, bdAttempts: 3, bdMode: 'texto',
       },
       round: 0, drawOrder: [], matchOrder: [], turnIndex: 0,
       drawerId: null, word: null, category: null, swapped: false,
@@ -311,6 +311,7 @@
           const num = (k, lo, hi) => { if (Number.isInteger(n[k]) && n[k] >= lo && n[k] <= hi) s[k] = n[k]; };
           num('tfWrite', 10, 600); num('tfDraw', 10, 600); num('tfGuess', 10, 600); num('tfSteps', 0, 30); num('tfRounds', 1, 5);
           num('bdFlags', 1, 200); num('bdSpeed', 3, 300); num('bdAttempts', 0, 10);
+          if (n.bdMode === 'texto' || n.bdMode === 'mapa') s.bdMode = n.bdMode;
           if (Array.isArray(n.categories)) { const c = n.categories.filter(k => CATEGORIAS[k]); if (c.length) s.categories = c; }
           break;
         }

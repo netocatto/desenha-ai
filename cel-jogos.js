@@ -22,9 +22,10 @@ window.CelJogos = (function () {
       <div class="lbl">Etapas por corrente</div><div class="opt" id="oTfS"></div>
       <div class="lbl">Rodadas</div><div class="opt" id="oTfR"></div>`;
     $('bdOpts').innerHTML = `
+      <div class="lbl">Como responder</div><div class="opt" id="oBdM"></div>
       <div class="lbl">Bandeiras por partida</div><div class="opt" id="oBdN"></div>
       <div class="lbl">Velocidade da revelação</div><div class="opt" id="oBdV"></div>
-      <div class="lbl">Chutes por pessoa em cada bandeira</div><div class="opt" id="oBdA"></div>`;
+      <div id="oBdAwrap"><div class="lbl">Chutes por pessoa em cada bandeira</div><div class="opt" id="oBdA"></div></div>`;
   }
   function lobby(s, set) {
     buildOpts();
@@ -45,6 +46,8 @@ window.CelJogos = (function () {
     optGroup($('oTfG'), [[20, '20s'], [30, '30s'], [45, '45s'], [60, '1 min']], st.tfGuess, v => set({ tfGuess: v }));
     optGroup($('oTfS'), [[0, 'Todas'], [3, '3'], [5, '5'], [7, '7'], [9, '9']], st.tfSteps, v => set({ tfSteps: v }));
     optGroup($('oTfR'), [1, 2, 3], st.tfRounds, v => set({ tfRounds: v }));
+    optGroup($('oBdM'), [['texto', '✍️ Digitar o nome'], ['mapa', '🗺️ Marcar no mapa (difícil)']], st.bdMode || 'texto', v => set({ bdMode: v }));
+    $('oBdAwrap').hidden = st.bdMode === 'mapa';                      // no mapa é sempre 1 palpite
     optGroup($('oBdN'), [5, 10, 15, 20, 30], st.bdFlags, v => set({ bdFlags: v }));
     optGroup($('oBdV'), [[8, '⚡ Rápida'], [15, 'Média'], [25, 'Lenta'], [40, '🐢 Bem lenta']], st.bdSpeed, v => set({ bdSpeed: v }));
     optGroup($('oBdA'), [[1, '1'], [2, '2'], [3, '3'], [0, 'Sem limite']], st.bdAttempts, v => set({ bdAttempts: v }));
@@ -182,9 +185,127 @@ window.CelJogos = (function () {
     for (const p of PAISES.lista) { const nn = PAISES.norm(p.nome); if (nn.startsWith(n)) starts.push(p); else if (nn.includes(n)) has.push(p); }
     return starts.sort((a, b) => a.nome.localeCompare(b.nome)).concat(has).slice(0, 7);
   }
+  // ------------------------------------------------------------ mapa interativo (modo difícil)
+  function criarMapa(cv, onPick) {
+    const st = { v: null, pin: null, destaque: null, certo: null, travado: false, pts: new Map(), moveu: false, pinch: null };
+    function tam() { const r = cv.getBoundingClientRect(); return [r.width, r.height]; }
+    function desenhar() {
+      const [w, h] = tam(); const dpr = window.devicePixelRatio || 1;
+      if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+      if (!st.v) st.v = MAPA.mundo(w, h);
+      const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      MAPA.desenhar(g, w, h, st.v, { destaque: st.destaque, certo: st.certo, pinos: st.pin ? [Object.assign({ cor: '#ff5d8f' }, st.pin)] : [] });
+    }
+    function limitar() {
+      const [w, h] = tam(), m = MAPA.mundo(w, h);
+      st.v.s = Math.max(m.s, Math.min(m.s * 120, st.v.s));
+      st.v.cy = Math.max(-MAPA.TOP, Math.min(-MAPA.BOTTOM, st.v.cy));
+      if (st.v.cx > 200) st.v.cx -= 360; if (st.v.cx < -200) st.v.cx += 360;
+    }
+    function zoom(f, x, y) {
+      const [w, h] = tam(); if (x == null) { x = w / 2; y = h / 2; }
+      const [lon, lat] = MAPA.telaParaGeo(st.v, w, h, x, y);
+      st.v.s *= f; limitar();
+      const [nx, ny] = MAPA.geoParaTela(st.v, w, h, lon, lat);
+      st.v.cx += (nx - x) / st.v.s; st.v.cy += (ny - y) / st.v.s; limitar(); desenhar();
+    }
+    cv.style.touchAction = 'none';
+    cv.addEventListener('pointerdown', (e) => { cv.setPointerCapture(e.pointerId); st.pts.set(e.pointerId, [e.clientX, e.clientY]); st.moveu = st.pts.size > 1; st.ini = [e.clientX, e.clientY]; });
+    cv.addEventListener('pointermove', (e) => {
+      if (!st.pts.has(e.pointerId)) return;
+      const ant = st.pts.get(e.pointerId); st.pts.set(e.pointerId, [e.clientX, e.clientY]);
+      if (st.pts.size === 2) {                           // pinça: zoom
+        const [a, b] = [...st.pts.values()];
+        const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+        if (st.pinch) { const r = cv.getBoundingClientRect(); zoom(d / st.pinch, (a[0] + b[0]) / 2 - r.left, (a[1] + b[1]) / 2 - r.top); }
+        st.pinch = d; st.moveu = true; return;
+      }
+      if (Math.hypot(e.clientX - st.ini[0], e.clientY - st.ini[1]) > 8) st.moveu = true;
+      if (st.moveu) { st.v.cx -= (e.clientX - ant[0]) / st.v.s; st.v.cy -= (e.clientY - ant[1]) / st.v.s; limitar(); desenhar(); }
+    });
+    const fimToque = (e) => {
+      if (!st.pts.has(e.pointerId)) return;
+      st.pts.delete(e.pointerId); if (st.pts.size < 2) st.pinch = null;
+      if (!st.moveu && !st.pts.size && !st.travado) {     // toque: marca o ponto
+        const r = cv.getBoundingClientRect(), [w, h] = tam();
+        let [lon, lat] = MAPA.telaParaGeo(st.v, w, h, e.clientX - r.left, e.clientY - r.top);
+        lon = ((lon + 540) % 360) - 180;
+        st.pin = { lon, lat };
+        st.destaque = MAPA.paisNoPonto(lon, lat, 14 / st.v.s * 111);
+        desenhar(); onPick && onPick(lon, lat, st.destaque);
+      }
+    };
+    cv.addEventListener('pointerup', fimToque); cv.addEventListener('pointercancel', fimToque);
+    cv.addEventListener('wheel', (e) => { e.preventDefault(); const r = cv.getBoundingClientRect(); zoom(e.deltaY < 0 ? 1.25 : 0.8, e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+    return {
+      st, desenhar, zoom,
+      reset() { st.v = null; desenhar(); },
+      focar(box) { const [w, h] = tam(); st.v = MAPA.encaixar(w, h, box, 0.25); limitar(); desenhar(); },
+    };
+  }
+  let bdMapa = null;
+
+  function renderBDMapa(s, prev) {
+    const g = s.g, gp = s.gp || {};
+    const key = 'mapa|' + g.idx + '|' + g.sub;
+    const body = $('bdBody');
+    if (key !== bdKey) {
+      bdKey = key;
+      if (g.sub === 'result') {
+        const r = g.resultado || {}; const meu = (r.palpites || []).find(x => x.pid === s.me.pid);
+        body.innerHTML = `<div class="center"><div class="muted">Era…</div><div class="big" style="font-size:34px;color:var(--yellow)">${esc(r.nome || '')}</div>
+          <div class="big" style="font-size:20px">${meu ? (meu.dist === 0 ? '🎯 Você marcou dentro do país!' : `📍 Você ficou a ${meu.dist.toLocaleString('pt-BR')} km`) + ` · +${meu.points}` + (meu.rank === 1 && meu.points ? ' 🥇' : '') : '😶 Você não palpitou'}</div></div>
+          <div class="mapBox"><canvas class="mapCv" id="bdMapCv"></canvas></div><p class="muted center" style="margin:0">Próxima bandeira já já…</p>`;
+        bdMapa = criarMapa($('bdMapCv'), null); bdMapa.st.travado = true; bdMapa.st.certo = r.code;
+        if (meu) bdMapa.st.pin = { lon: meu.lon, lat: meu.lat };
+        const pc = MAPA.porCodigo[r.code];
+        requestAnimationFrame(() => {
+          if (pc) { const b = pc.bbox.slice(); if (meu) { b[0] = Math.min(b[0], meu.lon); b[2] = Math.max(b[2], meu.lon); b[1] = Math.min(b[1], meu.lat); b[3] = Math.max(b[3], meu.lat); } bdMapa.focar(b); }
+          else bdMapa.desenhar();
+        });
+        return;
+      }
+      body.innerHTML = `<div class="bdMsg" id="bdMsg">📍 Toque no mapa onde fica o país da bandeira</div>
+        <div class="mapBox"><canvas class="mapCv" id="bdMapCv"></canvas>
+          <div class="mapZoom"><button id="mzIn">＋</button><button id="mzOut">－</button><button id="mzAll">🌍</button></div></div>
+        <button class="btn green" id="bdPinGo" disabled>Marque um ponto no mapa</button>
+        <div class="row" style="gap:8px"><button class="btn ghost" id="bdHint" style="font-size:15px"></button>${s.me.isMaster ? '<button class="btn ghost" id="bdSkip" style="font-size:15px;flex:0 0 38%">⏭ Pular</button>' : ''}</div>
+        <p class="muted center" style="margin:0;font-size:13px">Arraste para mover · dois dedos para zoom · 1 palpite por bandeira</p>`;
+      bdMapa = criarMapa($('bdMapCv'), (lon, lat, code) => {
+        $('bdPinGo').disabled = false; $('bdPinGo').textContent = '📍 Enviar palpite';
+        $('bdMsg').textContent = code ? 'País marcado (destacado em amarelo). Pode ajustar antes de enviar.' : 'Você marcou no mar. Pode ajustar antes de enviar.';
+      });
+      $('mzIn').onclick = () => bdMapa.zoom(1.6); $('mzOut').onclick = () => bdMapa.zoom(1 / 1.6); $('mzAll').onclick = () => bdMapa.reset();
+      $('bdPinGo').onclick = () => {
+        const p = bdMapa.st.pin; if (!p) return;
+        api('bdPin', { lon: p.lon, lat: p.lat });
+        bdMapa.st.travado = true; $('bdPinGo').disabled = true; $('bdPinGo').textContent = '✔ Palpite enviado';
+        $('bdMsg').textContent = 'Palpite enviado! Aguardando os outros…'; $('bdMsg').className = 'bdMsg ok';
+      };
+      $('bdHint').onclick = () => { $('bdHint').disabled = true; api('bdHint'); };
+      if ($('bdSkip')) { let armed = 0; $('bdSkip').onclick = () => { if (Date.now() - armed > 2000) { armed = Date.now(); $('bdSkip').textContent = 'Confirmar?'; return; } api('bdSkip'); }; }
+      requestAnimationFrame(() => bdMapa.desenhar());
+    }
+    if (g.sub === 'play') {
+      if (gp.palpite && !bdMapa.st.travado) {          // já palpitou (ex.: voltou para a página)
+        bdMapa.st.pin = gp.palpite; bdMapa.st.travado = true; bdMapa.desenhar();
+        $('bdPinGo').disabled = true; $('bdPinGo').textContent = '✔ Palpite enviado';
+      }
+      const h = $('bdHint');
+      if (h) { h.disabled = g.dicas.length >= g.maxDicas; h.textContent = g.dicas.length >= g.maxDicas ? '💡 Sem mais dicas' : `💡 Dica (−15 pts) · ${g.dicas.length}/${g.maxDicas}`; }
+      if (gp.palpite) { const m = $('bdMsg'); if (m) { m.textContent = `Palpite enviado! ${g.palpitaram}/${g.jogadores} já palpitaram`; m.className = 'bdMsg ok'; } }
+    }
+  }
+
   function renderBD(s, prev) {
     show('s-bd');
     const g = s.g, gp = s.gp || {};
+    if (g.mode === 'mapa') {
+      bdReveal = g.revealMs || bdReveal;
+      if (g.sub === 'play') bdLocalStart = performance.now() + g.startInMs - g.elapsedMs;
+      $('bdLabel').innerHTML = `🗺️ Bandeira ${g.idx} de ${g.total}<small>${g.dicas.length ? '💡 ' + g.dicas.length + ' dica(s) na TV' : 'marque o país no mapa'}</small>`;
+      return renderBDMapa(s, prev);
+    }
     bdReveal = g.revealMs || bdReveal;
     if (g.sub === 'play') bdLocalStart = performance.now() + g.startInMs - g.elapsedMs;
     $('bdLabel').innerHTML = `🚩 Bandeira ${g.idx} de ${g.total}<small>${g.dicas.length ? '💡 ' + g.dicas.length + ' dica(s) na TV' : 'quem acertar primeiro leva'}</small>`;
@@ -257,7 +378,8 @@ window.CelJogos = (function () {
     }
     if (g.kind === 'bd') {
       const box = $('bdPtsBox');
-      if (g.sub === 'play' && bdLocalStart != null) {
+      if (g.mode === 'mapa') { box.textContent = g.sub === 'play' ? `📍 ${g.palpitaram}/${g.jogadores}` : '🏁'; box.className = 'timer'; }
+      else if (g.sub === 'play' && bdLocalStart != null) {
         const p = Math.max(0, Math.min(1, (performance.now() - bdLocalStart) / bdReveal));
         box.textContent = Math.max(10, Math.round(100 - 50 * p - 15 * g.dicas.length)) + ' pts';
         box.className = 'timer';

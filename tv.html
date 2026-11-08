@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Desenha Aí! — TV (online)</title>
-<script src="qrcode.js?v=202611080913"></script>
+<script src="qrcode.js?v=202611080927"></script>
 <style>
   @font-face { font-family: 'Baloo 2'; src: url('fonts/Baloo2.ttf') format('truetype'); font-weight: 400 800; font-display: swap; }
   :root { --bg: #1b1440; --bg2: #271d5c; --card: #2f2470; --ink: #fff; --muted: #b9b0e6;
@@ -149,6 +149,9 @@
   .bdOverlay { position: absolute; left: 0; right: 0; bottom: 0; display: none; flex-direction: column; align-items: center; gap: 1vh; padding: 3vh 2vh;
     background: linear-gradient(transparent, rgba(27,20,64,.94) 30%); border-radius: 0 0 2vh 2vh; text-align: center; }
   .bdOverlay.on { display: flex; animation: fade .3s; }
+  .bdOverlay.mapa { padding: 1.2vh 2vh; gap: .3vh; }
+  .bdOverlay.mapa .win { font-size: 2.6vh !important; }
+  .bdOverlay.mapa .win .av { width: 4.2vh; height: 4.2vh; font-size: 2vh; }
   .bdOverlay .nm { font-size: 9vh; font-weight: 800; color: var(--yellow); line-height: 1; }
   .bdOverlay .cap { font-size: 2.6vh; color: var(--muted); font-weight: 700; }
   .bdOverlay .win { font-size: 4vh; font-weight: 800; display: flex; align-items: center; gap: 1.2vh; }
@@ -256,18 +259,20 @@
   <div class="rest" id="rest"></div>
 </section>
 
-<script src="paises.js?v=202611080913"></script>
-<script src="bandeiras-svg.js?v=202611080913"></script>
+<script src="paises.js?v=202611080927"></script>
+<script src="bandeiras-svg.js?v=202611080927"></script>
+<script src="mapa-dados.js?v=202611080927"></script>
+<script src="mapa.js?v=202611080927"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=202611080913"></script>
-<script src="palavras.js?v=202611080913"></script>
-<script src="telefone.js?v=202611080913"></script>
-<script src="bandeiras.js?v=202611080913"></script>
-<script src="core.js?v=202611080913"></script>
-<script src="online.js?v=202611080913"></script>
-<script src="tv.js?v=202611080913"></script>
-<script src="tv-jogos.js?v=202611080913"></script>
+<script src="firebase-config.js?v=202611080927"></script>
+<script src="palavras.js?v=202611080927"></script>
+<script src="telefone.js?v=202611080927"></script>
+<script src="bandeiras.js?v=202611080927"></script>
+<script src="core.js?v=202611080927"></script>
+<script src="online.js?v=202611080927"></script>
+<script src="tv.js?v=202611080927"></script>
+<script src="tv-jogos.js?v=202611080927"></script>
 </body>
 </html>

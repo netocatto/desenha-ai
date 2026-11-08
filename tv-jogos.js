@@ -193,8 +193,19 @@ window.TVJogos = (function () {
     gb.fillStyle = 'rgba(255,255,255,.18)'; gb.font = `800 ${BH * 0.4}px 'Baloo 2', sans-serif`; gb.textAlign = 'center'; gb.textBaseline = 'middle';
     gb.fillText('?', BW / 2, BH / 2);
   }
+  let bdMapRes = null;   // modo mapa: resultado desenhado no lugar da bandeira
+  function desenharMapaResultado(r) {
+    const pc = window.MAPA && MAPA.porCodigo[r.code];
+    const pins = (r.palpites || []).map(p => ({ lon: p.lon, lat: p.lat, cor: avColor(p.pid), rotulo: p.name, raio: Math.max(9, BH / 45) }));
+    let box = pc ? pc.bbox.slice() : [-170, -58, 190, 84];
+    pins.forEach(p => { box[0] = Math.min(box[0], p.lon); box[2] = Math.max(box[2], p.lon); box[1] = Math.min(box[1], p.lat); box[3] = Math.max(box[3], p.lat); });
+    const v = MAPA.encaixar(BW, BH, box, 0.18);
+    const m = MAPA.mundo(BW, BH); if (v.s < m.s) { v.s = m.s; v.cx = m.cx; v.cy = m.cy; }
+    gb.save(); MAPA.desenhar(gb, BW, BH, v, { certo: r.code, pinos: pins }); gb.restore();
+  }
   function quadro(now) {
     if (!$('s-bd').classList.contains('on')) return requestAnimationFrame(quadro);
+    if (bdMapRes) return requestAnimationFrame(quadro);           // mapa já desenhado
     fundo();
     if (bdImg && bdImg.complete && bdImg.naturalWidth && plano && bdLocalStart != null) {
       const p = bdResult ? 1 : Math.max(0, Math.min(1, (now - bdLocalStart) / bdReveal));
@@ -207,8 +218,7 @@ window.TVJogos = (function () {
       gb.restore();
       // pontos e barra caindo junto com a revelação
       if (S && S.g && S.g.kind === 'bd' && !bdResult) {
-        const pts = Math.max(10, Math.round(100 - 50 * p - 15 * (S.g.dicas || []).length));
-        $('bdPts').textContent = pts;
+        if (S.g.mode !== 'mapa') { const pts = Math.max(10, Math.round(100 - 50 * p - 15 * (S.g.dicas || []).length)); $('bdPts').textContent = pts; }
         $('bdBarFill').style.width = (p * 100).toFixed(1) + '%';
       }
       $('bdWait').classList.toggle('on', now < bdLocalStart);
@@ -220,7 +230,7 @@ window.TVJogos = (function () {
 
   es.addEventListener('bdFlag', (e) => {
     const f = JSON.parse(e.data); if (!f) return;
-    bdFlag = f; bdResult = null; bdReveal = f.revealMs;
+    bdFlag = f; bdResult = null; bdMapRes = null; bdReveal = f.revealMs;
     bdLocalStart = performance.now() - f.elapsedMs;
     plano = montarPlano(f);
     bdImg = new Image();
@@ -230,6 +240,17 @@ window.TVJogos = (function () {
   });
   es.addEventListener('bdResult', (e) => {
     const r = JSON.parse(e.data); bdResult = r;
+    if (r.modo === 'mapa' && window.MAPA) {
+      bdMapRes = r; desenharMapaResultado(r);
+      const med = ['🥇', '🥈', '🥉'];
+      const linhas = (r.palpites || []).slice(0, 4).map((p, i) => `<div class="win" >${med[i] || (i + 1) + 'º'} ${avatarHTML(p.pid, p.name)} ${esc(p.name)} — ${p.dist === 0 ? 'no país!' : p.dist.toLocaleString('pt-BR') + ' km'} <span style="color:var(--green)">+${p.points}</span></div>`).join('');
+      $('bdOverlay').innerHTML = `<div class="nm" style="font-size:6vh">${esc(r.nome)}</div>` + (linhas || '<div class="win">😶 Ninguém palpitou</div>');
+      $('bdOverlay').classList.add('on', 'mapa');
+      (r.palpites || []).length && r.palpites[0].points ? SFX.right() : SFX.timeup();
+      narrar(`Era ${r.nome}!` + (r.palpites && r.palpites[0] && r.palpites[0].points ? ` ${r.palpites[0].name} chegou mais perto.` : ''));
+      return;
+    }
+    $('bdOverlay').classList.remove('mapa');
     $('bdOverlay').innerHTML = `<div class="nm">${esc(r.nome)}</div><div class="cap">Capital: ${esc(r.capital)}</div>` +
       (r.winner ? `<div class="win">${avatarHTML(r.winner, r.winnerName)} ${esc(r.winnerName)} acertou! <span style="color:var(--green)">+${r.points}</span></div>` : '<div class="win">😶 Ninguém acertou</div>');
     $('bdOverlay').classList.add('on');
@@ -242,6 +263,7 @@ window.TVJogos = (function () {
     clearTimeout(toastT); toastT = setTimeout(() => { el.className = 'bdToast'; }, 2200);
   }
   es.addEventListener('bdWrong', (e) => { const d = JSON.parse(e.data); toast(`❌ ${d.name} chutou ${d.nome}`); SFX.wrong(); });
+  es.addEventListener('bdPinned', (e) => { const d = JSON.parse(e.data); toast(`📍 ${d.name} palpitou`, 'hint'); SFX.join(); });
   es.addEventListener('bdHint', (e) => { const d = JSON.parse(e.data); toast(`💡 ${d.by} pediu uma dica`, 'hint'); SFX.hint(); });
 
   function renderBD(s, prev) {
@@ -263,6 +285,7 @@ window.TVJogos = (function () {
     });
     if (ord.length > 12) { const d = document.createElement('div'); d.innerHTML = `<span class="muted">+ ${ord.length - 12} jogadores</span><span></span>`; sc.appendChild(d); }
     if (g.sub === 'result') { $('bdPts').textContent = g.resultado && g.resultado.points ? '+' + g.resultado.points : '0'; }
+    if (g.mode === 'mapa' && g.sub === 'play') { $('bdPts').textContent = `📍 ${g.palpitaram}/${g.jogadores}`; }
   }
 
   // ------------------------------------------------------------ cronômetro do telefone
@@ -294,7 +317,7 @@ window.TVJogos = (function () {
       const st = s.settings;
       const mus = st.music === false ? '🔇 sem música' : '🎵 com música';
       if (s.gameId === 'telefone') return `Escrever ${st.tfWrite}s · desenhar ${st.tfDraw}s · descrever ${st.tfGuess}s · ${st.tfSteps ? st.tfSteps + ' etapas' : 'todos passam por todas as correntes'} · ${st.tfRounds} rodada(s) · ${mus}`;
-      if (s.gameId === 'bandeiras') return `${st.bdFlags} bandeiras · revelação em ${st.bdSpeed}s · ${st.bdAttempts ? st.bdAttempts + ' chute(s) por bandeira' : 'chutes sem limite'} · ${mus} · 🚩 ${window.PAISES ? PAISES.lista.length : 200} países`;
+      if (s.gameId === 'bandeiras') return `${st.bdMode === 'mapa' ? '🗺️ marcar no mapa (difícil) · 1 palpite' : '✍️ digitar o nome · ' + (st.bdAttempts ? st.bdAttempts + ' chute(s) por bandeira' : 'chutes sem limite')} · ${st.bdFlags} bandeiras · revelação em ${st.bdSpeed}s · ${mus} · 🚩 ${window.PAISES ? PAISES.lista.length : 200} países`;
       return '';
     },
   };
