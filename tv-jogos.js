@@ -7,27 +7,69 @@ window.TVJogos = (function () {
   const fmt = (ms) => Math.max(0, Math.ceil(ms / 1000));
   let tfLocalEnd = null, bdLocalStart = null, bdReveal = 20000, bdFlag = null, bdImg = null, bdResult = null;
 
-  // ------------------------------------------------------------ narração (voz do navegador)
-  let voz = null;
+  // ------------------------------------------------------------ narração (voz na TV)
+  // App Android: voz do próprio aparelho (AndroidVoz). PC/navegador: voz do sistema (speechSynthesis).
+  // Cada jogador ganha um "jeito de falar" (tom e velocidade) para a leitura ficar divertida.
+  let voz = null, vozLigada = true;
+  try { vozLigada = localStorage.getItem('desenha-voz') !== '0'; } catch (e) {}
   function pickVoice() {
     if (!window.speechSynthesis) return;
-    const vs = speechSynthesis.getVoices();
-    voz = vs.find(v => /pt[-_]BR/i.test(v.lang)) || vs.find(v => /^pt/i.test(v.lang)) || null;
+    const vs = speechSynthesis.getVoices().filter(v => /^pt/i.test(v.lang));
+    voz = vs.find(v => /pt[-_]BR/i.test(v.lang) && /google|natural|online|francisca|antonio|maria|luciana/i.test(v.name))
+      || vs.find(v => /pt[-_]BR/i.test(v.lang)) || vs[0] || null;
   }
   if (window.speechSynthesis) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
-  function narrar(texto) {
+  const temVoz = () => !!(window.AndroidVoz || window.speechSynthesis);
+  function jeito(pid) {
+    if (!pid) return { pitch: 1.05, rate: 1.02 };
+    let h = 7; for (const ch of String(pid)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return { pitch: 0.8 + (h % 9) * 0.07, rate: 0.95 + ((h >> 4) % 5) * 0.04 };
+  }
+  function narrar(texto, pid) {
+    if (!vozLigada || !texto) return;
+    const j = jeito(pid);
+    if (window.AndroidVoz) { try { AndroidVoz.falar(String(texto), j.pitch, j.rate); } catch (e) {} return; }
     if (!window.speechSynthesis) return;
     try {
+      if (navigator.userActivation && !navigator.userActivation.hasBeenActive) avisoVoz(true);
       const u = new SpeechSynthesisUtterance(texto);
-      u.lang = 'pt-BR'; if (voz) u.voice = voz; u.rate = 1.02; u.pitch = 1.05;
-      speechSynthesis.speak(u);
+      u.lang = 'pt-BR'; if (voz) u.voice = voz; u.rate = j.rate; u.pitch = j.pitch;
+      speechSynthesis.resume(); speechSynthesis.speak(u);
     } catch (e) { /* sem voz neste aparelho */ }
+  }
+  function calar() { try { if (window.AndroidVoz) AndroidVoz.parar(); else if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {} }
+  // navegadores só deixam falar depois de um clique/tecla na página: um aviso pede isso uma vez
+  function avisoVoz(on) {
+    let el = document.getElementById('vozAviso');
+    if (!el) {
+      el = document.createElement('button'); el.id = 'vozAviso';
+      el.style.cssText = 'position:fixed;left:50%;top:2vh;transform:translateX(-50%);z-index:50;border:0;border-radius:999px;padding:1.2vh 3vh;font:800 2.6vh "Baloo 2",system-ui,sans-serif;background:#ffd23f;color:#1b1440;box-shadow:0 .6vh 0 rgba(0,0,0,.35);cursor:pointer;display:none';
+      el.textContent = '🔊 Clique aqui para ligar a voz do narrador';
+      document.body.appendChild(el);
+    }
+    el.style.display = on ? '' : 'none';
+  }
+  ['pointerdown', 'keydown'].forEach(ev => window.addEventListener(ev, () => {
+    const el = document.getElementById('vozAviso'); if (el && el.style.display !== 'none') { el.style.display = 'none'; narrar('Narrador ligado!'); }
+  }, { capture: true }));
+  // botão para ligar/desligar a voz (canto da TV, no Telefone sem fio)
+  function botaoVoz() {
+    let b = document.getElementById('vozBtn');
+    if (!b) {
+      b = document.createElement('button'); b.id = 'vozBtn';
+      b.style.cssText = 'position:fixed;right:1.5vw;bottom:2vh;z-index:40;border:0;border-radius:1.4vh;padding:.8vh 1.6vh;font:800 2.2vh "Baloo 2",system-ui,sans-serif;background:rgba(255,255,255,.12);color:#fff;cursor:pointer';
+      b.onclick = () => { vozLigada = !vozLigada; try { localStorage.setItem('desenha-voz', vozLigada ? '1' : '0'); } catch (e) {} if (!vozLigada) calar(); else narrar('Narrador ligado!'); botaoVoz(); };
+      document.body.appendChild(b);
+    }
+    b.textContent = vozLigada ? '🔊 Voz ligada' : '🔇 Voz desligada';
+    b.style.display = temVoz() && $('s-tf').classList.contains('on') ? '' : 'none';
   }
 
   // ------------------------------------------------------------ TELEFONE
   const TITLES = { write: '✍️ Todo mundo escrevendo uma frase…', draw: '🎨 Hora de desenhar!', guess: '🔎 O que será esse desenho?' };
+  setInterval(botaoVoz, 1000);
   function renderTF(s, prev) {
-    show('s-tf');
+    show('s-tf'); botaoVoz();
     const g = s.g;
     $('tfPlay').classList.toggle('on', g.sub === 'play');
     $('tfAlbum').classList.toggle('on', g.sub === 'album');
@@ -54,7 +96,11 @@ window.TVJogos = (function () {
       $('tfSum').innerHTML = `<h2>📞 Fim da rodada ${g.round}!</h2><div class="muted" style="font-size:3vh;font-weight:700">Pontos por descrições parecidas com o que foi desenhado</div>
         <div class="rows">${rows || '<div class="muted">Ninguém pontuou nesta rodada</div>'}</div>
         <div class="muted" style="font-size:2.6vh;font-weight:700">👑 O mestre ${last ? 'mostra o placar final' : 'começa a próxima rodada'} pelo celular</div>`;
-      if (!prev || !prev.g || prev.g.sub !== 'summary') SFX.right();
+      if (!prev || !prev.g || prev.g.sub !== 'summary') {
+        SFX.right();
+        const top = Object.entries(g.points || {}).sort((a, b) => b[1] - a[1])[0], tp = top && top[1] > 0 && playerById(top[0]);
+        narrar(`Fim da rodada ${g.round}!` + (tp ? ` Quem mais pontuou foi ${tp.name}, com ${top[1]} pontos.` : ''));
+      }
     }
     if (g.sub === 'album') {
       $('tfHead').innerHTML = `📒 Corrente de ${esc(g.album.owner || '')}<small>${g.album.chain}/${g.album.chains}</small>`;
@@ -86,9 +132,10 @@ window.TVJogos = (function () {
     // mantém só as últimas mensagens visíveis (estilo chat)
     while (chat.children.length > 4) chat.removeChild(chat.firstChild);
     if (animar) {
-      if (it.type === 'write') narrar(`${p.name} escreveu: ${it.text}`);
-      else if (it.type === 'draw') narrar(`${p.name} desenhou isso.`);
-      else narrar(`${p.name} achou que era: ${it.text}`);
+      const nome = p.name || it.name;
+      if (it.type === 'write') { narrar(`${nome} escreveu:`); narrar(it.text, it.pid); }
+      else if (it.type === 'draw') narrar(`E ${nome} desenhou isso!`);
+      else { narrar(`${nome} achou que era:`); narrar(it.text, it.pid); }
     }
   }
   function desenhar(c, strokes, w, h, dpr, dur) {
@@ -116,7 +163,7 @@ window.TVJogos = (function () {
     const d = JSON.parse(e.data);
     $('chat').innerHTML = ''; chatChain = d.chain;
     (d.items || []).forEach(it => addBubble(it, false));
-    if (!(d.items || []).length) { SFX.join(); const p = playerById(d.owner); if (p) narrar(`Corrente de ${p.name}`); }
+    if (!(d.items || []).length) { SFX.join(); calar(); const p = playerById(d.owner); if (p) narrar(`Agora, a corrente de ${p.name}!`); }
   });
   es.addEventListener('tfItem', (e) => { const it = JSON.parse(e.data); if (it.chain !== chatChain) { $('chat').innerHTML = ''; chatChain = it.chain; } addBubble(it, true); });
 

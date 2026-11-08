@@ -135,7 +135,8 @@
     }
 
     // ---------- álbum (apresentação na TV) ----------
-    function itemDelay(it) { return it.type === 'draw' ? 7000 : 4500; }
+    // tempo de cada mensagem do álbum: dá para a voz da TV terminar de ler frases longas
+    function itemDelay(it) { return it.type === 'draw' ? 7000 : Math.min(12000, Math.max(4500, 2800 + 80 * String(it.text || '').length)); }
     function scheduleAuto(ms) {
       if (albumTimer) clearTimeout(albumTimer);
       albumTimer = null;
