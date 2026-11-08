@@ -138,6 +138,7 @@
       if (client.role === 'tv') return client.es.emit(event, data);
       if (event === 'state') queue(client.pid + '/s', JSON.stringify(data));
       else if (event === 'unknown' || event === 'kicked') queue(client.pid + '/x', event + ':' + Date.now());
+      else queue(client.pid + '/ev/' + event, JSON.stringify({ d: data, n: Date.now() + Math.random() }));   // eventos do jogo (ex.: desenho a descrever)
     }
 
     const ready = dbReady.then(async (d) => {
@@ -234,12 +235,16 @@
         else if (h.online === false) status('TV desconectada… aguardando');
         else status('');
       }));
-      unsubs.push(db.onValue('salas/' + code + '/views/' + db.uid, (v) => {
+      const evSeen = {};
+      unsubs.push(db.onValue('salas/' + code + '/views/' + db.uid + '/ev', (v) => {
         if (!v) return;
-        if (v.r) { try { const r = JSON.parse(v.r); if (waiters[r.req]) { waiters[r.req](r); delete waiters[r.req]; } } catch { } }
-        if (v.s && v.s !== lastS) { lastS = v.s; try { lastView = JSON.parse(v.s); } catch { } if (es) es.emit('state', v.s); }
-        if (v.x && v.x !== lastX) { lastX = v.x; if (es) es.emit(v.x.split(':')[0], {}); }
+        Object.keys(v).forEach((k) => { if (v[k] !== evSeen[k]) { evSeen[k] = v[k]; try { const o = JSON.parse(v[k]); if (es) es.emit(k, o.d); } catch { } } });
       }));
+      // escutas separadas: estado (s), resposta de entrada (r) e avisos (x) — assim o desenho (ev) não é baixado de novo
+      const base = 'salas/' + code + '/views/' + db.uid;
+      unsubs.push(db.onValue(base + '/r', (rv) => { if (!rv) return; try { const r = JSON.parse(rv); if (waiters[r.req]) { waiters[r.req](r); delete waiters[r.req]; } } catch { } }));
+      unsubs.push(db.onValue(base + '/s', (sv) => { if (sv && sv !== lastS) { lastS = sv; try { lastView = JSON.parse(sv); } catch { } if (es) es.emit('state', sv); } }));
+      unsubs.push(db.onValue(base + '/x', (xv) => { if (xv && xv !== lastX) { lastX = xv; if (es) es.emit(xv.split(':')[0], {}); } }));
     }
     function presence() {
       const p = 'salas/' + code + '/presenca/' + db.uid;

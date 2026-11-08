@@ -4,13 +4,14 @@
 //  Não sabe nada de rede: quem usa fornece send() e joinURL().
 // =============================================================
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.DesenhaCore = factory();
-})(this, function () {
+  if (typeof module === 'object' && module.exports) {
+    module.exports = factory({ telefone: require('./telefone.js'), bandeiras: require('./bandeiras.js') });
+  } else root.DesenhaCore = factory(root.DesenhaJogos || {});
+})(this, function (JOGOS) {
   'use strict';
 
   const REVEAL_MS = 7000;
-  const MAX_JOGADORES = 15;       // tempo mostrando a resposta antes do próximo
+  const MAX_JOGADORES = 30;
   const PTS_ACERTO = 10;        // pontos de quem adivinha
   const PTS_DESENHISTA = 5;     // pontos de quem desenhou
 
@@ -56,10 +57,19 @@
     const clients = new Set();   // objetos do transporte: { role: 'tv'|'player', pid, ... }
     let timer = null;
     let version = 0;
+    let modulo = null;            // jogo ativo que não é o Desenha Aí (telefone, bandeiras)
 
     const game = {
       phase: 'lobby',            // lobby | word | drawing | reveal | end
-      settings: { rounds: 2, attempts: 3, time: 90, music: true, categories: Object.keys(CATEGORIAS) },
+      settings: {
+        gameId: 'desenha', music: true,
+        // Desenha Aí
+        rounds: 2, attempts: 3, time: 90, hints: true, showLetters: true, categories: Object.keys(CATEGORIAS),
+        // Telefone sem fio
+        tfWrite: 60, tfDraw: 90, tfGuess: 45, tfSteps: 0, tfRounds: 1,
+        // Jogo das Bandeiras
+        bdFlags: 10, bdSpeed: 15, bdAttempts: 3,
+      },
       round: 0, drawOrder: [], matchOrder: [], turnIndex: 0,
       drawerId: null, word: null, category: null, swapped: false,
       endsAt: null, pausedRemaining: null,
@@ -138,7 +148,8 @@
         mask: game.word ? mask(game.word) : null,
         letters: game.word ? letterCount(game.word) : null,
         words: game.word ? wordCount(game.word) : null,
-        hint: game.phase === 'drawing' ? { votes: game.hintVotes.length, needed: hintVoters().length, used: game.hintUsed } : null,
+        hint: game.phase === 'drawing' && game.settings.hints ? { votes: game.hintVotes.length, needed: hintVoters().length, used: game.hintUsed } : null,
+        hintLetters: game.phase === 'drawing' && !game.settings.showLetters && game.hintUsed ? game.revealed.map(i => game.word[i].toUpperCase()) : null,
         remainingMs: remainingMs(),
         timerRunning: game.phase === 'drawing' && game.pausedRemaining == null && game.endsAt != null,
         buzz: game.buzz ? { pid: game.buzz.pid, name: nameOf(game.buzz.pid) } : null,
@@ -148,9 +159,12 @@
         }) : null,
         revealMs: game.revealUntil ? Math.max(0, game.revealUntil - Date.now()) : null,
         joinURL: opts.joinURL(),
+        gameId: game.settings.gameId,
         palavras: palavrasInfo,
         v: version,
       };
+      if (!game.settings.showLetters) { v.mask = null; v.letters = null; v.words = null; }
+      if (modulo && game.phase === 'play') v.g = modulo.view();
       return Object.assign(v, extraView());
     }
     function viewFor(client) {
@@ -162,6 +176,7 @@
           attemptsLeft: game.settings.attempts === 0 ? null : game.settings.attempts - (game.attemptsUsed[me.pid] || 0),
           hintVoted: game.hintVotes.indexOf(me.pid) >= 0 } : null;
         if (me && me.pid === game.drawerId && game.word) { v.word = game.word; v.canSwap = !game.swapped; }
+        if (me && modulo && game.phase === 'play') v.gp = modulo.playerView(me.pid);
       }
       return v;
     }
@@ -246,8 +261,31 @@
       game.phase = 'end'; game.drawerId = null; game.word = null; game.revealUntil = null;
       broadcastState();
     }
+    function stopModulo() { if (modulo) { try { modulo.stop(); } catch (e) { log('erro ao parar jogo: ' + e.message); } } modulo = null; }
+    function toPlayer(pid, event, data) { clients.forEach(c => { if (c.role === 'player' && c.pid === pid) send(c, event, data); }); }
+    function startModulo(id) {
+      const factory = JOGOS[id];
+      if (!factory) return;
+      players.forEach(p => { p.score = 0; });
+      stopModulo();
+      game.phase = 'play';
+      const ctx = {
+        players, settings: game.settings, log,
+        order: () => order.slice(),
+        connected: () => order.filter(pid => { const p = players.get(pid); return p && p.conns > 0; }),
+        masterId: () => masterId,
+        nameOf, shuffle,
+        broadcastState, broadcastTV, toPlayer,
+        addScore(pid, n) { const p = players.get(pid); if (p) p.score += n; },
+        finish() { stopModulo(); game.phase = 'end'; broadcastState(); },
+      };
+      modulo = factory(ctx);
+      modulo.start();
+      broadcastState();
+    }
     function backToLobby() {
       clearTimer();
+      stopModulo();
       if (pendente) { aplicarPalavras(pendente.cats, pendente.info); pendente = null; }
       Object.assign(game, { phase: 'lobby', round: 0, drawerId: null, word: null, category: null, buzz: null,
         endsAt: null, pausedRemaining: null, strokes: [], lastResult: null, revealUntil: null, attemptsUsed: {} });
@@ -267,6 +305,12 @@
           if (Number.isInteger(n.attempts) && n.attempts >= 0 && n.attempts <= 10) s.attempts = n.attempts;
           if (Number.isInteger(n.time) && n.time >= 0 && n.time <= 600) s.time = n.time;
           if (typeof n.music === 'boolean') s.music = n.music;
+          if (['desenha', 'telefone', 'bandeiras'].indexOf(n.gameId) >= 0) s.gameId = n.gameId;
+          if (typeof n.hints === 'boolean') s.hints = n.hints;
+          if (typeof n.showLetters === 'boolean') s.showLetters = n.showLetters;
+          const num = (k, lo, hi) => { if (Number.isInteger(n[k]) && n[k] >= lo && n[k] <= hi) s[k] = n[k]; };
+          num('tfWrite', 10, 600); num('tfDraw', 10, 600); num('tfGuess', 10, 600); num('tfSteps', 0, 30); num('tfRounds', 1, 5);
+          num('bdFlags', 1, 200); num('bdSpeed', 3, 300); num('bdAttempts', 0, 10);
           if (Array.isArray(n.categories)) { const c = n.categories.filter(k => CATEGORIAS[k]); if (c.length) s.categories = c; }
           break;
         }
@@ -279,6 +323,7 @@
         }
         case 'start':
           if (!isMaster || game.phase !== 'lobby' || order.length < 1) return;
+          if (game.settings.gameId !== 'desenha') return startModulo(game.settings.gameId);
           return startGame();
         case 'kick':
           if (!isMaster || game.phase !== 'lobby' || a.pid === masterId) return;
@@ -293,7 +338,7 @@
           if (!isDrawer || game.phase !== 'word') return;
           return beginDrawing();
         case 'hint':
-          if (game.phase !== 'drawing' || isDrawer || game.hintUsed) return;
+          if (game.phase !== 'drawing' || isDrawer || game.hintUsed || !game.settings.hints) return;
           if (game.hintVotes.indexOf(pid) < 0) game.hintVotes.push(pid);
           checkHint();
           break;
@@ -333,11 +378,14 @@
           return endTurn(null, 'pulado');
         case 'endGame':
           if (!isMaster || game.phase === 'lobby') return;
-          clearTimer(); game.phase = 'end'; game.drawerId = null; game.word = null; break;
+          clearTimer(); stopModulo(); game.phase = 'end'; game.drawerId = null; game.word = null; break;
         case 'lobby':
           if (!isMaster || game.phase !== 'end') return;
           return backToLobby();
-        default: return;
+        default:
+          // ações do jogo ativo (telefone, bandeiras)
+          if (modulo && game.phase === 'play') { if (modulo.action(pid, a) !== false) broadcastState(); }
+          return;
       }
       broadcastState();
     }
@@ -392,6 +440,7 @@
         }
         clients.add(client);
         if (client.role === 'tv') { send(client, 'strokes', game.strokes); send(client, 'avatars', avatarsMap()); }
+        if (modulo && game.phase === 'play' && modulo.onConnect) modulo.onConnect(client);
         broadcastState();
         return true;
       },
@@ -401,6 +450,7 @@
         const pl = players.get(client.pid);
         if (client.role === 'player' && pl) pl.conns = Math.max(0, pl.conns - 1);
         checkHint();                                  // quem saiu não trava a dica dos outros
+        if (modulo && game.phase === 'play' && modulo.onPresence) modulo.onPresence();
         broadcastState();
       },
       state(pid) {
@@ -432,12 +482,15 @@
       action(b) {
         b = b || {};
         if (!players.has(b.pid)) return [404, { error: 'jogador desconhecido' }];
+        // pedido de dados do jogo ativo (ex.: o desenho a descrever no Telefone sem fio)
+        if (b.type === 'fetch' && modulo && modulo.fetch) return [200, { ok: true, data: modulo.fetch(b.pid, b.what) }];
         handleAction(b.pid, b);
         return [200, { ok: true, state: players.has(b.pid) ? viewFor({ role: 'player', pid: b.pid }) : null }];
       },
       draw(b) {
         b = b || {};
         const ops = b.ops;
+        if (modulo && game.phase === 'play') { if (modulo.draw && Array.isArray(ops)) modulo.draw(b.pid, ops); return [204, null]; }
         if (b.pid !== game.drawerId || game.phase !== 'drawing' || !Array.isArray(ops)) return [204, null];
         for (const op of ops) {
           if (op.o === 'b') game.strokes.push({ id: op.id, c: op.c, s: op.s, p: [op.x, op.y] });

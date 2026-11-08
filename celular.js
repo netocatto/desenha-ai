@@ -19,6 +19,7 @@ function connect() {
   es = new EventSource('/events?role=player&pid=' + encodeURIComponent(pid));
   es.addEventListener('state', (e) => { sseAlive = Date.now(); setStatus(''); onState(JSON.parse(e.data)); });
   es.addEventListener('ping', () => { sseAlive = Date.now(); });
+  ['tfTask'].forEach(ev => es.addEventListener(ev, (e) => { if (window.CelJogos) CelJogos.onEvent(ev, JSON.parse(e.data)); }));
   es.addEventListener('unknown', forget);
   es.addEventListener('kicked', () => { es.close(); pid = null; LS.del('da_pid'); show('s-join'); $('joinErr').textContent = 'Você foi removido da sala.'; });
   es.onerror = () => setStatus('reconectando…');
@@ -125,7 +126,9 @@ function onState(s) {
     if (s.phase === 'word' || s.phase === 'lobby') { strokes = []; queue = []; }
   }
 
+  $('s-draw').classList.toggle('tf', s.phase === 'play');
   if (s.phase === 'lobby') return renderLobby(s);
+  if (s.phase === 'play') return window.CelJogos ? CelJogos.render(s, prev) : null;
   if (s.phase === 'word') return s.me.isDrawer ? renderWord(s) : renderGuess(s);
   if (s.phase === 'drawing') return s.me.isDrawer ? renderDraw(s, prev) : renderGuess(s, prev);
   if (s.phase === 'reveal') return renderReveal(s);
@@ -167,13 +170,17 @@ function renderLobby(s) {
   $('waitPanel').style.display = s.me.isMaster ? 'none' : '';
   $('startBtn').style.display = s.me.isMaster ? '' : 'none';
   const timeLbl = st.time ? st.time + 's' : 'sem limite';
-  $('waitSettings').textContent = `${st.rounds} rodada(s) · ${st.attempts ? st.attempts + ' tentativa(s)' : 'tentativas sem limite'} · ${timeLbl}`;
+  const GNAME = { desenha: '🎨 Desenha Aí!', telefone: '📞 Telefone sem fio', bandeiras: '🚩 Jogo das Bandeiras' };
+  if (s.gameId !== 'desenha') { $('waitSettings').textContent = 'Jogo escolhido: ' + GNAME[s.gameId]; }
+  else $('waitSettings').textContent = `${GNAME.desenha} · ${st.rounds} rodada(s) · ${st.attempts ? st.attempts + ' tentativa(s)' : 'tentativas sem limite'} · ${timeLbl}`;
   if (s.me.isMaster) {
     const set = (patch) => api('settings', { settings: { ...st, ...patch } });
     optGroup($('optRounds'), ROUNDS, st.rounds, v => set({ rounds: v }));
     optGroup($('optAttempts'), ATTEMPTS, st.attempts, v => set({ attempts: v }));
     optGroup($('optTime'), TIMES, st.time, v => set({ time: v }));
     optGroup($('optMusic'), [[true, '🎵 Ligada'], [false, '🔇 Desligada']], st.music !== false, v => set({ music: v }));
+    optGroup($('optHints'), [[true, '💡 Ligadas'], [false, '🚫 Desligadas']], st.hints !== false, v => set({ hints: v }));
+    optGroup($('optLetters'), [[true, '🔤 Mostrar'], [false, '🙈 Esconder']], st.showLetters !== false, v => set({ showLetters: v }));
     optGroup($('optCats'), s.allCategories.map(c => [c.key, c.name]), st.categories, v => {
       const has = st.categories.includes(v);
       const next = has ? st.categories.filter(c => c !== v) : [...st.categories, v];
@@ -181,6 +188,7 @@ function renderLobby(s) {
     });
     const n = s.players.length;
     $('startBtn').textContent = n === 1 ? '▶ Iniciar teste solo' : `▶ Iniciar partida (${n} jogadores)`;
+    if (window.CelJogos) CelJogos.lobby(s, set);
   }
 }
 $('startBtn').onclick = () => api('start');
@@ -290,7 +298,10 @@ function norm(e) {
   const r = pad.getBoundingClientRect();
   return [r4((e.clientX - r.left) / r.width), r4((e.clientY - r.top) / r.height)];
 }
-function canDraw() { return S && S.phase === 'drawing' && S.me && S.me.isDrawer; }
+function canDraw() {
+  if (S && S.phase === 'play') return !!(S.g && S.g.kind === 'tf' && S.g.sub === 'play' && S.g.type === 'draw' && S.gp && S.gp.playing && !S.gp.done);
+  return S && S.phase === 'drawing' && S.me && S.me.isDrawer;
+}
 
 pad.addEventListener('pointerdown', (e) => {
   if (!canDraw() || activePointer !== null) return;
@@ -384,17 +395,19 @@ function renderGuess(s, prev) {
 // palavra escondida + quantidade de letras + botão de dica (todos precisam pedir)
 function renderHint(s) {
   const box = $('hintBox');
-  if (s.phase !== 'drawing' || !s.mask) { box.hidden = true; return; }
+  if (s.phase !== 'drawing' || (!s.mask && !s.hint)) { box.hidden = true; return; }
   box.hidden = false;
-  const maskTxt = s.mask.split(' ').map(w => w.split('').join(' ')).join('   ');
-  const cnt = `${s.letters} letras` + (s.words > 1 ? ` · ${s.words} palavras` : '');
-  const h = s.hint || { votes: 0, needed: 0, used: false };
-  let btn;
-  if (h.used) btn = `<div class="hintDone">💡 Dica liberada!</div>`;
+  // com "mostrar letras" desligado, não aparece a máscara: só as letras liberadas pela dica
+  const maskTxt = s.mask ? s.mask.split(' ').map(w => w.split('').join(' ')).join('   ') : (s.hintLetters ? 'Letras: ' + s.hintLetters.join(', ') : '❓❓❓');
+  const cnt = s.letters ? `🔤 ${s.letters} letras` + (s.words > 1 ? ` · ${s.words} palavras` : '') + ' · ' : '';
+  const h = s.hint;
+  let btn = '';
+  if (!h) btn = '';
+  else if (h.used) btn = `<div class="hintDone">💡 Dica liberada!</div>`;
   else if (s.me.hintVoted) btn = `<button class="btn ghost hintBtn" disabled>💡 Você pediu dica · ${h.votes}/${h.needed}</button>`;
   else btn = `<button class="btn ghost hintBtn" id="hintBtn">💡 Pedir dica · ${h.votes}/${h.needed}</button>`;
-  box.innerHTML = `<div class="hintMask">${esc(maskTxt)}</div><div class="muted" style="font-weight:700">🔤 ${cnt} · ${esc(s.category || '')}</div>${btn}
-    ${!h.used ? '<div class="muted" style="font-size:13px">Quando todos pedirem, aparecem 1 ou 2 letras</div>' : ''}`;
+  box.innerHTML = `<div class="hintMask">${esc(maskTxt)}</div><div class="muted" style="font-weight:700">${cnt}${esc(s.category || '')}</div>${btn}
+    ${h && !h.used ? '<div class="muted" style="font-size:13px">Quando todos pedirem, aparecem 1 ou 2 letras</div>' : ''}`;
   const b = $('hintBtn'); if (b) b.onclick = () => { b.disabled = true; api('hint'); };
 }
 document.querySelectorAll('[data-m]').forEach(b => {

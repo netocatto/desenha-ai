@@ -126,9 +126,11 @@ function musicMode(s) {
   if (s.phase === 'lobby') return 'lobby';
   if (s.phase === 'word') return 'word';
   if (s.phase === 'drawing') return s.buzz ? 'pause' : 'draw';
+  if (s.phase === 'play' && window.TVJogos) return TVJogos.musicMode(s);
   return null;                                             // resultado e fim: silêncio (efeitos sonoros)
 }
 function urgency() {
+  if (S && S.phase === 'play' && window.TVJogos) return TVJogos.urgency(S);
   if (!S || S.phase !== 'drawing') return 0;
   if (!S.settings.time) return 0.3;                        // sem limite: ritmo médio constante
   const ms = S.timerRunning && localEnd != null ? localEnd - performance.now() : (S.remainingMs || 0);
@@ -144,7 +146,8 @@ es.addEventListener('strokes', (e) => { strokes = JSON.parse(e.data); redraw(); 
 es.addEventListener('avatars', (e) => {
   AV = JSON.parse(e.data) || {};
   if (!S) return;                                  // só redesenha (sem mexer no relógio nem nos sons)
-  if (S.phase === 'lobby') renderLobby(S, S); else if (S.phase === 'end') renderEnd(S); else renderGame(S, S);
+  if (S.phase === 'lobby') renderLobby(S, S); else if (S.phase === 'end') renderEnd(S);
+  else if (S.phase === 'play') { if (window.TVJogos) TVJogos.render(S, S); } else renderGame(S, S);
 });
 
 // ---------- avatares (personagem 32 bits; sem avatar = inicial colorida) ----------
@@ -171,6 +174,7 @@ function onState(s) {
   localEnd = s.remainingMs != null ? performance.now() + s.remainingMs : null;
   if (s.phase === 'lobby') renderLobby(s, prev);
   else if (s.phase === 'end') renderEnd(s);
+  else if (s.phase === 'play') { if (window.TVJogos) TVJogos.render(s, prev); }
   else renderGame(s, prev);
   updateMusic();
 }
@@ -210,6 +214,9 @@ function renderLobby(s, prev) {
   const st = s.settings;
   const cats = s.allCategories.filter(c => st.categories.includes(c.key)).map(c => c.name).join(', ');
   $('lobbySettings').textContent = `${st.rounds} rodada(s) · ${st.attempts ? st.attempts + ' tentativa(s) por pessoa' : 'tentativas sem limite'} · ${st.time ? st.time + 's por desenho' : 'sem limite de tempo'} · ${st.music === false ? '🔇 sem música' : '🎵 com música'} · ${cats}` + (s.palavras ? ` · 📦 ${s.palavras.total} palavras` + (s.palavras.versao ? ` (lista v${s.palavras.versao}${s.palavras.origem === 'online' ? ', atualizada' : ''})` : '') : '');
+  const GAMES = { desenha: '🎨 Jogo: Desenha Aí!', telefone: '📞 Jogo: Telefone sem fio', bandeiras: '🚩 Jogo: Jogo das Bandeiras' };
+  $('gameTag').textContent = GAMES[s.gameId] || '';
+  if (s.gameId !== 'desenha' && window.TVJogos) $('lobbySettings').textContent = TVJogos.lobbyText(s);
   const m = s.players.find(p => p.isMaster);
   $('lobbyHint').textContent = m ? `👑 ${m.name} é o mestre: ele configura e inicia a partida pelo celular.` : 'O primeiro a entrar vira o 👑 mestre e inicia a partida.';
 }
@@ -221,7 +228,7 @@ function renderGame(s, prev) {
   $('drawerName').innerHTML = s.drawerId ? avatarHTML(s.drawerId, s.drawerName, 'mid') + ' ' + esc(s.drawerName) : '';
   $('nextName').textContent = s.nextName ? 'depois: ' + s.nextName : '';
   $('catLbl').textContent = s.category ? `Categoria: ${s.category}` : 'Categoria';
-  $('mask').textContent = s.mask ? s.mask.split(' ').map(w => w.split('').join(' ')).join('   ') : '';
+  $('mask').textContent = s.mask ? s.mask.split(' ').map(w => w.split('').join(' ')).join('   ') : (s.word === undefined && s.category ? (s.hintLetters ? 'Letras: ' + s.hintLetters.join(', ') : '❓ ❓ ❓') : '');
   $('letters').textContent = s.letters ? `🔤 ${s.letters} letras` + (s.words > 1 ? ` · ${s.words} palavras` : '') : '';
   const hi = $('hintInfo');
   if (s.hint && s.hint.needed > 0) {
@@ -231,7 +238,11 @@ function renderGame(s, prev) {
 
   const sc = $('scores'); sc.innerHTML = '';
   sc.classList.toggle('many', s.players.length > 8);
-  [...s.players].sort((a, b) => b.score - a.score).forEach(p => {
+  const ord = [...s.players].sort((a, b) => b.score - a.score);
+  // com muita gente, mostra os 12 primeiros (+ quem está desenhando)
+  const vis = ord.length > 14 ? ord.filter((p, i) => i < 12 || p.pid === s.drawerId) : ord;
+  if (ord.length > vis.length) setTimeout(() => { const d = document.createElement('div'); d.innerHTML = `<span class="muted">+ ${ord.length - vis.length} jogadores</span><span></span>`; sc.appendChild(d); });
+  vis.forEach(p => {
     const d = document.createElement('div'); if (p.pid === s.drawerId) d.className = 'dr';
     const tries = (p.pid !== s.drawerId && s.phase === 'drawing' && p.attemptsUsed) ? `<span class="tries">${'✖'.repeat(p.attemptsUsed)}</span>` : '';
     d.innerHTML = `<span>${avatarHTML(p.pid, p.name)} ${p.pid === s.drawerId ? '✏️ ' : ''}${esc(p.name)}${tries}</span><span>${p.score}</span>`;

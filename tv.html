@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Desenha Aí! — TV (online)</title>
-<script src="qrcode.js?v=202611051839"></script>
+<script src="qrcode.js?v=202611080910"></script>
 <style>
   @font-face { font-family: 'Baloo 2'; src: url('fonts/Baloo2.ttf') format('truetype'); font-weight: 400 800; font-display: swap; }
   :root { --bg: #1b1440; --bg2: #271d5c; --card: #2f2470; --ink: #fff; --muted: #b9b0e6;
@@ -100,6 +100,71 @@
   .podium .pt { font-size: 3vh; color: var(--muted); font-weight: 700; }
   .rest { font-size: 3vh; color: var(--muted); font-weight: 700; }
 
+  /* ---------- seleção de jogo na sala ---------- */
+  .gameTag { font-size: 3.4vh; font-weight: 800; color: var(--yellow); }
+
+  /* ---------- Telefone sem fio ---------- */
+  #s-tf { flex-direction: column; align-items: center; justify-content: center; padding: 3vh 4vw; }
+  .tfPlay, .tfAlbum, .tfSum { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; }
+  .tfPlay.on, .tfAlbum.on, .tfSum.on { display: flex; }
+  .tfPlay { justify-content: center; gap: 2.4vh; }
+  .tfStep { font-size: 2.8vh; font-weight: 800; color: var(--muted); letter-spacing: .3vh; text-transform: uppercase; }
+  .tfTitle { font-size: 7vh; font-weight: 800; text-align: center; line-height: 1.05; }
+  .tfTimer { font-size: 11vh; font-weight: 800; color: var(--yellow); line-height: 1; }
+  .tfTimer.low { color: var(--red); animation: pulse .5s infinite alternate; }
+  .tfGrid { display: flex; flex-wrap: wrap; gap: 1.6vh; justify-content: center; max-width: 90vw; }
+  .tfGrid .p { display: flex; flex-direction: column; align-items: center; gap: .4vh; font-weight: 800; font-size: 2.2vh; width: 11vh; position: relative; }
+  .tfGrid .p .av { width: 8vh; height: 8vh; font-size: 4vh; }
+  .tfGrid .p.ok .av { outline: .5vh solid var(--green); }
+  .tfGrid .p .ck { position: absolute; top: -1vh; right: 0; background: var(--green); color: #1b1440; border-radius: 50%; width: 3.6vh; height: 3.6vh; display: none; align-items: center; justify-content: center; font-size: 2.4vh; }
+  .tfGrid .p.ok .ck { display: flex; }
+  .tfGrid .p.off { opacity: .4; }
+  .tfAlbum { gap: 1.6vh; }
+  .tfHead { font-size: 4.4vh; font-weight: 800; }
+  .tfHead small { color: var(--muted); font-size: 2.6vh; margin-left: 1vh; }
+  .chat { flex: 1; width: min(1100px, 92vw); overflow: hidden; display: flex; flex-direction: column; gap: 1.8vh; padding: 1vh 2vh 6vh; justify-content: flex-end; }
+  .msg { display: flex; gap: 1.4vh; align-items: flex-end; animation: msgIn .4s ease-out; }
+  .msg.r { flex-direction: row-reverse; }
+  .msg .av { width: 7vh; height: 7vh; font-size: 3.4vh; border-radius: 1.4vh; flex: 0 0 auto; }
+  .bubble { background: var(--card); border-radius: 2.4vh; padding: 1.4vh 2.2vh; max-width: 70%; box-shadow: 0 .8vh 0 rgba(0,0,0,.3); }
+  .msg.r .bubble { background: #3a2d86; }
+  .bubble .who { font-size: 2.2vh; font-weight: 800; color: var(--muted); }
+  .bubble .txt { font-size: 4.2vh; font-weight: 800; line-height: 1.15; }
+  .bubble.write .txt { color: var(--yellow); }
+  .bubble canvas { display: block; background: #fff; border-radius: 1.4vh; margin-top: .6vh; }
+  .bubble .sim { display: inline-block; margin-top: .6vh; font-size: 2.2vh; font-weight: 800; background: var(--bg2); border-radius: 999px; padding: .2vh 1.4vh; }
+  .tfSum { justify-content: center; gap: 2.4vh; }
+  .tfSum h2 { font-size: 7vh; margin: 0; }
+  .tfSum .rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(34vh, 1fr)); gap: 1.2vh; width: min(1200px, 92vw); }
+  .tfSum .row { display: flex; align-items: center; gap: 1.2vh; background: var(--card); border-radius: 1.6vh; padding: 1vh 1.6vh; font-size: 3vh; font-weight: 800; }
+  .tfSum .row b { margin-left: auto; color: var(--green); }
+  @keyframes msgIn { from { transform: translateY(3vh); opacity: 0 } to { transform: none; opacity: 1 } }
+
+  /* ---------- Bandeiras ---------- */
+  #s-bd { padding: 2vh 1.5vw; gap: 1.5vw; align-items: center; justify-content: center; }
+  .bdMain { position: relative; flex: 0 0 auto; }
+  #bdc { display: block; border-radius: 2vh; background: #2f2470; box-shadow: 0 1.6vh 0 rgba(0,0,0,.35), 0 0 0 .8vh var(--card); }
+  .bdWait { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; font-size: 7vh; font-weight: 800; text-align: center; }
+  .bdWait.on { display: flex; }
+  .bdOverlay { position: absolute; left: 0; right: 0; bottom: 0; display: none; flex-direction: column; align-items: center; gap: 1vh; padding: 3vh 2vh;
+    background: linear-gradient(transparent, rgba(27,20,64,.94) 30%); border-radius: 0 0 2vh 2vh; text-align: center; }
+  .bdOverlay.on { display: flex; animation: fade .3s; }
+  .bdOverlay .nm { font-size: 9vh; font-weight: 800; color: var(--yellow); line-height: 1; }
+  .bdOverlay .cap { font-size: 2.6vh; color: var(--muted); font-weight: 700; }
+  .bdOverlay .win { font-size: 4vh; font-weight: 800; display: flex; align-items: center; gap: 1.2vh; }
+  .bdOverlay .win .av { width: 7vh; height: 7vh; font-size: 3.4vh; }
+  .bdPts { font-size: 8vh; font-weight: 800; color: var(--yellow); line-height: 1; }
+  .bdPts small { font-size: 2.6vh; color: var(--muted); }
+  .bdBar { height: 1.2vh; background: var(--bg2); border-radius: 999px; overflow: hidden; margin-top: 1vh; }
+  .bdBar div { height: 100%; width: 0; background: var(--cyan); }
+  .bdHints { display: flex; flex-direction: column; gap: .8vh; font-size: 2.3vh; font-weight: 700; line-height: 1.2; }
+  .bdHints .h { background: var(--bg2); border-radius: 1.2vh; padding: .8vh 1.2vh; animation: msgIn .4s; }
+  .bdHints .none { color: var(--muted); }
+  .bdToast { position: fixed; top: 4vh; left: 50%; transform: translateX(-50%); font-size: 4vh; font-weight: 800; padding: 1.2vh 3.4vh; border-radius: 999px;
+    background: var(--red); color: #fff; display: none; z-index: 5; white-space: nowrap; }
+  .bdToast.on { display: block; animation: drop .35s cubic-bezier(.3,1.6,.6,1); }
+  .bdToast.hint { background: var(--yellow); color: #1b1440; }
+
   @keyframes pop { from { transform: scale(.6); opacity: 0 } to { transform: scale(1); opacity: 1 } }
   @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
   @keyframes pulse { to { transform: scale(1.06) } }
@@ -115,6 +180,7 @@
     <div class="logo"><span class="a">Desenha</span><br><span class="b">Aí!</span></div>
     <div class="steps"><span id="netStep">1. Celular com <b>internet</b> (Wi-Fi ou 4G)</span><br>2. Aponte a câmera para o QR code<br>ou acesse:</div>
     <div><span class="url" id="url">…</span></div>
+    <div class="gameTag" id="gameTag"></div>
     <div class="settings" id="lobbySettings"></div>
     <div class="plist" id="lobbyPlayers"></div>
     <div class="muted" style="font-size:2.6vh;font-weight:700" id="lobbyHint">O primeiro a entrar vira o 👑 mestre e inicia a partida.</div>
@@ -151,6 +217,38 @@
   </div>
 </section>
 
+<!-- TELEFONE SEM FIO -->
+<section class="screen" id="s-tf">
+  <div class="tfPlay" id="tfPlay">
+    <div class="tfStep" id="tfStep"></div>
+    <div class="tfTitle" id="tfTitle"></div>
+    <div class="tfTimer" id="tfTimer">--</div>
+    <div class="tfGrid" id="tfGrid"></div>
+  </div>
+  <div class="tfAlbum" id="tfAlbum">
+    <div class="tfHead" id="tfHead"></div>
+    <div class="chat" id="chat"></div>
+  </div>
+  <div class="tfSum" id="tfSum"></div>
+</section>
+
+<!-- JOGO DAS BANDEIRAS -->
+<section class="screen" id="s-bd">
+  <div class="bdMain" id="bdMain">
+    <canvas id="bdc"></canvas>
+    <div class="bdWait" id="bdWait"></div>
+    <div class="bdOverlay" id="bdOverlay"></div>
+  </div>
+  <div class="side bdSide">
+    <div class="logo" style="font-size:4.2vh"><span class="a">Jogo das</span> <span class="b">Bandeiras</span></div>
+    <div class="info"><div class="k" id="bdIdx">Bandeira</div><div class="bdPts"><span id="bdPts">100</span><small> pts</small></div>
+      <div class="bdBar"><div id="bdBarFill"></div></div></div>
+    <div class="info"><div class="k">Dicas</div><div class="bdHints" id="bdHints"></div></div>
+    <div class="scores" id="bdScores"></div>
+  </div>
+  <div class="bdToast" id="bdToast"></div>
+</section>
+
 <!-- FIM -->
 <section class="screen" id="s-end">
   <div class="logo"><span class="a">Fim de</span> <span class="b">jogo!</span></div>
@@ -158,13 +256,17 @@
   <div class="rest" id="rest"></div>
 </section>
 
+<script src="paises.js?v=202611080910"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=202611051839"></script>
-<script src="palavras.js?v=202611051839"></script>
-<script src="core.js?v=202611051839"></script>
-<script src="online.js?v=202611051839"></script>
-<script src="tv.js?v=202611051839"></script>
+<script src="firebase-config.js?v=202611080910"></script>
+<script src="palavras.js?v=202611080910"></script>
+<script src="telefone.js?v=202611080910"></script>
+<script src="bandeiras.js?v=202611080910"></script>
+<script src="core.js?v=202611080910"></script>
+<script src="online.js?v=202611080910"></script>
+<script src="tv.js?v=202611080910"></script>
+<script src="tv-jogos.js?v=202611080910"></script>
 </body>
 </html>

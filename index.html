@@ -116,6 +116,32 @@
   .hintBtn { color: var(--ink); border-color: var(--yellow); font-size: 17px; }
   .hintBtn:disabled { opacity: .7; border-color: var(--card); }
   .hintDone { font-weight: 800; color: var(--yellow); font-size: 18px; }
+  .gamePick { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 6px; }
+  .gamePick button { font: inherit; font-weight: 800; font-size: 18px; text-align: left; border: 2px solid #4a3d96; background: transparent; color: var(--ink);
+    border-radius: 14px; padding: 8px 12px; display: flex; align-items: center; gap: 10px; }
+  .gamePick button small { display: block; font-weight: 600; font-size: 13px; color: var(--muted); }
+  .gamePick button.sel { background: var(--yellow); color: #1b1440; border-color: var(--yellow); }
+  .gamePick button.sel small { color: #4a3d1a; }
+  .gamePick .ico { font-size: 28px; }
+  #dsOpts[hidden], #tfOpts[hidden], #bdOpts[hidden] { display: none; }
+  .tfDone { display: none; background: var(--green) !important; color: #1b1440 !important; font-size: 16px; }
+  #s-draw.tf .tfDone { display: flex; }
+  #s-draw.tf #giveUp, #s-draw.tf #miniEye, #s-draw.tf .rotHint { display: none; }
+  .tfBody, .bdBody { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+  .tfBig { font-size: 26px; font-weight: 800; line-height: 1.15; text-align: center; }
+  .tfPrompt { background: #fff; color: #1b1440; border-radius: 18px; padding: 14px; font-size: 22px; font-weight: 800; text-align: center; box-shadow: 0 5px 0 var(--pink); }
+  textarea.tfIn { width: 100%; min-height: 96px; font: inherit; font-size: 20px; padding: 12px; border-radius: 14px; border: 3px solid transparent; outline: none; resize: none; }
+  textarea.tfIn:focus { border-color: var(--yellow); }
+  .tfView { background: #fff; border-radius: 14px; display: block; margin: 0 auto; box-shadow: 0 4px 0 rgba(0,0,0,.35); }
+  .bdIn { width: 100%; font: inherit; font-size: 22px; padding: 12px 14px; border-radius: 14px; border: 3px solid transparent; outline: none; }
+  .bdIn:focus { border-color: var(--yellow); }
+  .sugs { display: flex; flex-direction: column; gap: 6px; }
+  .sugs button { font: inherit; font-weight: 800; font-size: 19px; text-align: left; border: 0; border-radius: 12px; padding: 10px 14px; background: var(--card); color: var(--ink); }
+  .sugs button.sel { background: var(--cyan); color: #1b1440; }
+  .bdMsg { text-align: center; font-weight: 800; min-height: 1.3em; }
+  .bdMsg.bad { color: var(--red); } .bdMsg.ok { color: var(--green); }
+  .shake { animation: shake .35s; }
+  @keyframes shake { 25% { transform: translateX(-8px) } 75% { transform: translateX(8px) } }
   .masterbar { display: none; gap: 8px; }
   .masterbar.on { display: flex; }
   .masterbar .btn { font-size: 14px; padding: 8px; }
@@ -130,7 +156,7 @@
   <div class="grow">
     <h1 class="center"><span class="a">Desenha</span> <span class="b">Aí!</span></h1>
     <p class="center muted" style="margin:0">Digite seu nome para entrar na sala</p>
-    <p class="center muted" style="margin:0;font-size:11px;opacity:.6">versão 10</p>
+    <p class="center muted" style="margin:0;font-size:11px;opacity:.6">versão 11</p>
     <input type="text" id="sala" maxlength="6" placeholder="Código da sala (ex.: K7P2)" autocomplete="off" style="text-transform:uppercase;display:none">
     <input type="text" id="name" maxlength="16" placeholder="Seu nome" autocomplete="off" enterkeyhint="go">
     <div class="avPick">
@@ -154,11 +180,18 @@
   </div>
   <div class="card" id="masterPanel">
     <h2>👑 Você é o mestre</h2>
-    <div class="lbl">Rodadas</div><div class="opt" id="optRounds"></div>
-    <div class="lbl">Tentativas erradas por pessoa</div><div class="opt" id="optAttempts"></div>
-    <div class="lbl">Tempo para desenhar</div><div class="opt" id="optTime"></div>
+    <div class="lbl">Qual jogo?</div><div class="gamePick" id="optGame"></div>
+    <div id="dsOpts">
+      <div class="lbl">Rodadas</div><div class="opt" id="optRounds"></div>
+      <div class="lbl">Tentativas erradas por pessoa</div><div class="opt" id="optAttempts"></div>
+      <div class="lbl">Tempo para desenhar</div><div class="opt" id="optTime"></div>
+      <div class="lbl">Dicas (todos votam e aparecem letras)</div><div class="opt" id="optHints"></div>
+      <div class="lbl">Mostrar quantidade de letras</div><div class="opt" id="optLetters"></div>
+      <div class="lbl">Categorias</div><div class="opt" id="optCats"></div>
+    </div>
+    <div id="tfOpts" hidden></div>
+    <div id="bdOpts" hidden></div>
     <div class="lbl">Música na TV</div><div class="opt" id="optMusic"></div>
-    <div class="lbl">Categorias</div><div class="opt" id="optCats"></div>
   </div>
   <div id="waitPanel" class="card center">
     <div class="big">Aguardando o mestre<br>iniciar a partida…</div>
@@ -197,6 +230,7 @@
       <button class="tb" id="undo">↩️</button>
       <button class="tb" id="clear">🗑️</button>
       <button class="tb" id="giveUp" title="Encerrar desenho">🏳️</button>
+      <button class="tb tfDone" id="tfDoneBtn" title="Terminei">✔ Pronto</button>
     </div>
   </div>
   <div class="judge" id="judge">
@@ -225,6 +259,18 @@
   </div>
 </section>
 
+<!-- TELEFONE SEM FIO -->
+<section class="screen" id="s-tf">
+  <div class="topbar"><div class="wordmini" id="tfLabel"></div><div class="timer" id="tfTimer">--</div></div>
+  <div class="tfBody" id="tfBody"></div>
+</section>
+
+<!-- JOGO DAS BANDEIRAS -->
+<section class="screen" id="s-bd">
+  <div class="topbar"><div class="wordmini" id="bdLabel"></div><div class="timer" id="bdPtsBox">--</div></div>
+  <div class="bdBody" id="bdBody"></div>
+</section>
+
 <!-- FIM -->
 <section class="screen" id="s-end">
   <div class="grow center">
@@ -236,13 +282,15 @@
   </div>
 </section>
 
-<script src="avatar.js?v=202611051839"></script>
+<script src="avatar.js?v=202611080910"></script>
+<script src="paises.js?v=202611080910"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=202611051839"></script>
-<script src="online.js?v=202611051839"></script>
+<script src="firebase-config.js?v=202611080910"></script>
+<script src="online.js?v=202611080910"></script>
 <script>if (!new URLSearchParams(location.search).get("sala")) document.addEventListener("DOMContentLoaded", function () { document.getElementById("sala").style.display = ""; });</script>
-<script src="celular.js?v=202611051839"></script>
+<script src="celular.js?v=202611080910"></script>
+<script src="cel-jogos.js?v=202611080910"></script>
 </body>
 </html>
