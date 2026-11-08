@@ -151,6 +151,7 @@
   .masterbar .btn { font-size: 14px; padding: 8px; }
   .status { position: fixed; top: 6px; right: 8px; font-size: 12px; color: var(--muted); z-index: 9; }
 </style>
+<script>(function(){var B="202611081000";function chk(force){fetch("versao.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){if(!j||j.build===B||new URLSearchParams(location.search).get("_v")===j.build)return;var livre=true;try{livre=!S||((S.phase==="lobby"||!S.phase)&&!(S.players||[]).length)}catch(e){}if(force||livre){var u=new URL(location.href);u.searchParams.set("_v",j.build);location.replace(u.toString())}}).catch(function(){})}chk(true);setInterval(function(){chk(false)},120000)})();</script>
 </head>
 <body>
 <div class="status" id="status"></div>
@@ -286,17 +287,17 @@
   </div>
 </section>
 
-<script src="avatar.js?v=202611080927"></script>
-<script src="paises.js?v=202611080927"></script>
-<script src="mapa-dados.js?v=202611080927"></script>
-<script src="mapa.js?v=202611080927"></script>
+<script src="avatar.js?v=202611081000"></script>
+<script src="paises.js?v=202611081000"></script>
+<script src="mapa-dados.js?v=202611081000"></script>
+<script src="mapa.js?v=202611081000"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=202611080927"></script>
-<script src="online.js?v=202611080927"></script>
+<script src="firebase-config.js?v=202611081000"></script>
+<script src="online.js?v=202611081000"></script>
 <script>if (!new URLSearchParams(location.search).get("sala")) document.addEventListener("DOMContentLoaded", function () { document.getElementById("sala").style.display = ""; });</script>
-<script src="celular.js?v=202611080927"></script>
-<script src="cel-jogos.js?v=202611080927"></script>
+<script src="celular.js?v=202611081000"></script>
+<script src="cel-jogos.js?v=202611081000"></script>
 </body>
 </html>

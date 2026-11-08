@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Desenha Aí! — TV (online)</title>
-<script src="qrcode.js?v=202611080927"></script>
+<script src="qrcode.js?v=202611081000"></script>
 <style>
   @font-face { font-family: 'Baloo 2'; src: url('fonts/Baloo2.ttf') format('truetype'); font-weight: 400 800; font-display: swap; }
   :root { --bg: #1b1440; --bg2: #271d5c; --card: #2f2470; --ink: #fff; --muted: #b9b0e6;
@@ -174,6 +174,7 @@
   @keyframes drop { from { transform: translate(-50%, -200%) } to { transform: translate(-50%, 0) } }
   @keyframes flash { 0% { opacity: .5 } 100% { opacity: 0 } }
 </style>
+<script>(function(){var B="202611081000";function chk(force){fetch("versao.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){if(!j||j.build===B||new URLSearchParams(location.search).get("_v")===j.build)return;var livre=true;try{livre=!S||((S.phase==="lobby"||!S.phase)&&!(S.players||[]).length)}catch(e){}if(force||livre){var u=new URL(location.href);u.searchParams.set("_v",j.build);location.replace(u.toString())}}).catch(function(){})}chk(true);setInterval(function(){chk(false)},120000)})();</script>
 </head>
 <body>
 
@@ -259,20 +260,20 @@
   <div class="rest" id="rest"></div>
 </section>
 
-<script src="paises.js?v=202611080927"></script>
-<script src="bandeiras-svg.js?v=202611080927"></script>
-<script src="mapa-dados.js?v=202611080927"></script>
-<script src="mapa.js?v=202611080927"></script>
+<script src="paises.js?v=202611081000"></script>
+<script src="bandeiras-svg.js?v=202611081000"></script>
+<script src="mapa-dados.js?v=202611081000"></script>
+<script src="mapa.js?v=202611081000"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=202611080927"></script>
-<script src="palavras.js?v=202611080927"></script>
-<script src="telefone.js?v=202611080927"></script>
-<script src="bandeiras.js?v=202611080927"></script>
-<script src="core.js?v=202611080927"></script>
-<script src="online.js?v=202611080927"></script>
-<script src="tv.js?v=202611080927"></script>
-<script src="tv-jogos.js?v=202611080927"></script>
+<script src="firebase-config.js?v=202611081000"></script>
+<script src="palavras.js?v=202611081000"></script>
+<script src="telefone.js?v=202611081000"></script>
+<script src="bandeiras.js?v=202611081000"></script>
+<script src="core.js?v=202611081000"></script>
+<script src="online.js?v=202611081000"></script>
+<script src="tv.js?v=202611081000"></script>
+<script src="tv-jogos.js?v=202611081000"></script>
 </body>
 </html>
