@@ -57,6 +57,15 @@
     for (const r of p.rings) for (let i = 0; i < r.length; i++) { const d = km(lon, lat, r[i][0], r[i][1]); if (d < best) best = d; }
     return best;
   }
+  /** ponto do país mais perto de (lon, lat) — para traçar a linha do palpite */
+  function maisProximo(lon, lat, code) {
+    const p = porCodigo[code]; if (!p) return null;
+    if (contem(p, lon, lat)) return [lon, lat];
+    if (p.tiny) return [p.lx, p.ly];
+    let best = 1e9, pt = null;
+    for (const r of p.rings) for (let i = 0; i < r.length; i++) { const d = km(lon, lat, r[i][0], r[i][1]); if (d < best) { best = d; pt = r[i]; } }
+    return pt ? [pt[0], pt[1]] : [p.lx, p.ly];
+  }
   /** país onde caiu o ponto ('' = território sem código; null = mar). Perto de ilhas pequenas, pega o mais próximo. */
   function paisNoPonto(lon, lat, toleranciaKm) {
     for (const p of porTamanho) if (contem(p, lon, lat)) return p.code;
@@ -88,12 +97,14 @@
   function telaParaGeo(v, w, h, x, y) { return [(x - w / 2) / v.s + v.cx, -((y - h / 2) / v.s + v.cy)]; }
   function geoParaTela(v, w, h, lon, lat) { return [(lon - v.cx) * v.s + w / 2, (-lat - v.cy) * v.s + h / 2]; }
   /**
-   * desenha o mapa. opts: { destaque: código, corDestaque, certo: código, pinos: [{lon,lat,cor,rotulo}] }
+   * desenha o mapa. opts: { destaque, corDestaque, certo, foco (apaga o resto e realça o certo),
+   *   linhas: [{lon,lat,lon2,lat2,cor}], pinos: [{lon,lat,cor,rotulo,raio}] }
    */
   function desenhar(g, w, h, v, opts) {
     opts = opts || {};
     g.save();
-    g.fillStyle = '#1d4e89'; g.fillRect(0, 0, w, h);                 // mar
+    const terra = opts.foco ? '#b9b09b' : '#efe6cf';
+    g.fillStyle = opts.foco ? '#143a66' : '#1d4e89'; g.fillRect(0, 0, w, h);                 // mar
     g.translate(w / 2, h / 2); g.scale(v.s, v.s); g.translate(-v.cx, -v.cy);
     // repete o mundo para os lados (arrastar além de 180°)
     for (const off of [-360, 0, 360]) {
@@ -102,24 +113,45 @@
       g.save(); g.translate(off, 0);
       for (const p of paises) {
         const path = caminho(p);
-        g.fillStyle = p.code && p.code === opts.certo ? '#3ee08f' : (p.code && p.code === opts.destaque ? (opts.corDestaque || '#ffd23f') : '#efe6cf');
+        g.fillStyle = p.code && p.code === opts.certo ? '#3ee08f' : (p.code && p.code === opts.destaque ? (opts.corDestaque || '#ffd23f') : terra);
         g.fill(path);
       }
       g.lineWidth = 0.8 / v.s;                                           // fronteira com ~1 pixel
       g.strokeStyle = '#6b5b45'; g.lineJoin = 'round';
       for (const p of paises) g.stroke(caminho(p));
+      if (opts.certo && opts.foco && porCodigo[opts.certo]) {          // contorno brilhante no país certo
+        const pc = porCodigo[opts.certo];
+        g.save(); g.shadowColor = '#3ee08f'; g.shadowBlur = 18; g.lineWidth = 3 / v.s; g.strokeStyle = '#ffffff';
+        for (const p of paises) if (p.code === opts.certo) g.stroke(caminho(p));
+        if (pc.tiny || (pc.bbox[2] - pc.bbox[0]) * v.s < 24) {          // país pequeno: alvo bem visível
+          g.beginPath(); g.arc(pc.lx, -pc.ly, 12 / v.s, 0, Math.PI * 2); g.fillStyle = '#3ee08f'; g.fill(); g.stroke();
+          g.shadowBlur = 0; g.lineWidth = 4 / v.s; g.strokeStyle = '#3ee08f';
+          g.beginPath(); g.arc(pc.lx, -pc.ly, 26 / v.s, 0, Math.PI * 2); g.stroke();
+          g.lineWidth = 2 / v.s; g.strokeStyle = 'rgba(62,224,143,.6)';
+          g.beginPath(); g.arc(pc.lx, -pc.ly, 40 / v.s, 0, Math.PI * 2); g.stroke();
+        }
+        g.restore();
+      }
       // países muito pequenos: um círculo para conseguir ver e tocar
       for (const p of paises) {
         const b = p.bbox;
         if ((b[2] - b[0]) * v.s < 5 && (b[3] - b[1]) * v.s < 5 && p.code) {
           g.beginPath(); g.arc(p.lx, -p.ly, 3.5 / v.s, 0, Math.PI * 2);
-          g.fillStyle = p.code === opts.certo ? '#3ee08f' : (p.code === opts.destaque ? (opts.corDestaque || '#ffd23f') : 'rgba(239,230,207,.9)');
+          g.fillStyle = p.code === opts.certo ? '#3ee08f' : (p.code === opts.destaque ? (opts.corDestaque || '#ffd23f') : (opts.foco ? 'rgba(185,176,155,.9)' : 'rgba(239,230,207,.9)'));
           g.fill(); g.lineWidth = 1 / v.s; g.stroke();
         }
       }
       g.restore();
     }
     g.restore();
+    for (const l of opts.linhas || []) {                                 // palpite → ponto mais perto do país certo
+      const [x1, y1] = geoParaTela(v, w, h, l.lon, l.lat), [x2, y2] = geoParaTela(v, w, h, l.lon2, l.lat2);
+      g.save(); g.setLineDash([10, 7]); g.lineCap = 'round';
+      g.lineWidth = 6; g.strokeStyle = 'rgba(27,20,64,.85)'; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.lineWidth = 3; g.strokeStyle = l.cor || '#fff'; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.setLineDash([]); g.beginPath(); g.arc(x2, y2, 5, 0, Math.PI * 2); g.fillStyle = '#fff'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#1b1440'; g.stroke();
+      g.restore();
+    }
     for (const pin of opts.pinos || []) {
       const [x, y] = geoParaTela(v, w, h, pin.lon, pin.lat);
       const r = pin.raio || 9;
@@ -134,5 +166,5 @@
     }
   }
 
-  return { paises, porCodigo, contem, distancia, paisNoPonto, km, desenhar, encaixar, mundo, telaParaGeo, geoParaTela, TOP, BOTTOM };
+  return { paises, porCodigo, contem, distancia, maisProximo, paisNoPonto, km, desenhar, encaixar, mundo, telaParaGeo, geoParaTela, TOP, BOTTOM };
 });

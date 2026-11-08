@@ -20,7 +20,7 @@
     let fila = [], idx = -1;
     let atual = null;          // { code, estilo, seed, startAt, revealMs, endsAt }
     let sub = 'play';          // play | result
-    let dicas = 0, tentativas = {}, timer = null, resultado = null;
+    let dicasDe = {}, tentativas = {}, timer = null, resultado = null;
     let palpites = {};         // modo mapa: pid -> { lon, lat, t, code, dist }
     const modoMapa = () => S.bdMode === 'mapa';
     let saco = [];             // formatos de revelação: todos aparecem antes de repetir
@@ -32,10 +32,11 @@
       if (i === 1) return PAISES.norm(p.capital).indexOf(PAISES.norm(p.nome)) >= 0 ? '🏛️ A capital tem o mesmo nome do país' : '🏛️ Capital: ' + p.capital;
       return '⭐ ' + p.curiosidade;
     }
-    function pontosAgora() {
+    // dicas são individuais: só quem pediu vê, e só ele perde pontos
+    function pontosAgora(pid) {
       if (!atual) return 0;
       const prog = Math.max(0, Math.min(1, (Date.now() - atual.startAt) / atual.revealMs));
-      return Math.max(10, Math.round(100 - 50 * prog - 15 * dicas));
+      return Math.max(10, Math.round(100 - 50 * prog - 15 * (pid ? dicasDe[pid] || 0 : 0)));
     }
     function flagEvent() {
       return atual ? { code: atual.code, estilo: atual.estilo, seed: atual.seed, elapsedMs: Date.now() - atual.startAt, revealMs: atual.revealMs, idx } : null;
@@ -49,7 +50,7 @@
       atual = { code: p.code, estilo: proximoEstilo(), seed: Math.floor(Math.random() * 1e9),
         startAt: Date.now() + 1500, revealMs };
       atual.endsAt = atual.startAt + revealMs + EXTRA_MS;
-      sub = 'play'; dicas = 0; tentativas = {}; resultado = null; palpites = {};
+      sub = 'play'; dicasDe = {}; tentativas = {}; resultado = null; palpites = {};
       ctx.broadcastTV('bdFlag', flagEvent());
       timer = setTimeout(() => fim(null), atual.endsAt - Date.now());
       ctx.broadcastState();
@@ -63,7 +64,7 @@
       lista.forEach((g, i) => {
         let pts = Math.max(0, Math.round(100 - g.dist / 40));        // 0 km = 100; 4.000 km ou mais = 0
         if (i === 0 && pts > 0) pts += BONUS_PRIMEIRO;               // quem chegou mais perto ganha bônus
-        pts = Math.max(0, pts - 15 * dicas);
+        pts = Math.max(0, pts - 15 * (dicasDe[g.pid] || 0)); g.dicas = dicasDe[g.pid] || 0;
         g.points = pts; g.rank = i + 1; g.dist = Math.round(g.dist);
         if (pts) ctx.addScore(g.pid, pts);
       });
@@ -79,7 +80,7 @@
       if (modoMapa()) return fimMapa();
       clear();
       const p = PAISES.porCodigo[atual.code];
-      const pts = winner ? pontosAgora() : 0;
+      const pts = winner ? pontosAgora(winner) : 0;
       if (winner) ctx.addScore(winner, pts);
       resultado = { code: p.code, nome: p.nome, capital: p.capital, winner, winnerName: winner ? ctx.nameOf(winner) : null, points: pts };
       sub = 'result';
@@ -132,9 +133,9 @@
             return true;
           }
           case 'bdHint':
-            if (sub !== 'play' || !atual || dicas >= MAX_DICAS) return false;
-            dicas += 1;
-            ctx.broadcastTV('bdHint', { n: dicas, by: ctx.nameOf(pid) });
+            if (sub !== 'play' || !atual || (dicasDe[pid] || 0) >= MAX_DICAS) return false;
+            dicasDe[pid] = (dicasDe[pid] || 0) + 1;
+            ctx.broadcastTV('bdHint', { by: ctx.nameOf(pid) });       // a TV só avisa; o texto vai só para o celular dele
             return true;
           case 'bdSkip':
             if (pid !== ctx.masterId() || sub !== 'play') return false;
@@ -151,15 +152,16 @@
           elapsedMs: atual ? Math.max(0, Date.now() - atual.startAt) : 0,
           revealMs: atual ? atual.revealMs : 0,
           remainingMs: atual && sub === 'play' ? Math.max(0, atual.endsAt - Date.now()) : null,
-          dicas: p ? Array.from({ length: dicas }, (_, i) => dicaTexto(i, p)) : [],
           maxDicas: MAX_DICAS,
-          pontos: sub === 'play' ? pontosAgora() : null,
+          pontos: sub === 'play' ? pontosAgora(null) : null,
           resultado: sub === 'result' ? resultado : null,
           erros: tentativas,
         };
       },
       playerView(pid) {
-        return { tentativas: tentativas[pid] || 0, max: S.bdAttempts, palpite: palpites[pid] ? { lon: palpites[pid].lon, lat: palpites[pid].lat } : null };
+        const p = atual ? PAISES.porCodigo[atual.code] : null, n = dicasDe[pid] || 0;
+        return { tentativas: tentativas[pid] || 0, max: S.bdAttempts,
+          dicas: p && sub === 'play' ? Array.from({ length: n }, (_, i) => dicaTexto(i, p)) : [], palpite: palpites[pid] ? { lon: palpites[pid].lon, lat: palpites[pid].lat } : null };
       },
     };
   }

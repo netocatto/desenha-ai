@@ -194,7 +194,7 @@ window.CelJogos = (function () {
       if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
       if (!st.v) st.v = MAPA.mundo(w, h);
       const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      MAPA.desenhar(g, w, h, st.v, { destaque: st.destaque, certo: st.certo, pinos: st.pin ? [Object.assign({ cor: '#ff5d8f' }, st.pin)] : [] });
+      MAPA.desenhar(g, w, h, st.v, { destaque: st.destaque, certo: st.certo, foco: st.foco, linhas: st.linha ? [st.linha] : [], pinos: st.pin ? [Object.assign({ cor: '#ff5d8f' }, st.pin)] : [] });
     }
     function limitar() {
       const [w, h] = tam(), m = MAPA.mundo(w, h);
@@ -244,6 +244,11 @@ window.CelJogos = (function () {
     };
   }
   let bdMapa = null;
+  function mostrarDicas(lista) {
+    const el = $('bdDicas'); if (!el) return; lista = lista || [];
+    if (el.children.length === lista.length) return;
+    el.innerHTML = lista.map(d => `<div>${esc(d)}</div>`).join('');
+  }
 
   function renderBDMapa(s, prev) {
     const g = s.g, gp = s.gp || {};
@@ -254,10 +259,10 @@ window.CelJogos = (function () {
       if (g.sub === 'result') {
         const r = g.resultado || {}; const meu = (r.palpites || []).find(x => x.pid === s.me.pid);
         body.innerHTML = `<div class="center"><div class="muted">Era…</div><div class="big" style="font-size:34px;color:var(--yellow)">${esc(r.nome || '')}</div>
-          <div class="big" style="font-size:20px">${meu ? (meu.dist === 0 ? '🎯 Você marcou dentro do país!' : `📍 Você ficou a ${meu.dist.toLocaleString('pt-BR')} km`) + ` · +${meu.points}` + (meu.rank === 1 && meu.points ? ' 🥇' : '') : '😶 Você não palpitou'}</div></div>
+          <div class="big" style="font-size:20px">${meu ? (meu.dist === 0 ? '🎯 Você marcou dentro do país!' : `📍 Você ficou a ${meu.dist.toLocaleString('pt-BR')} km`) + ` · +${meu.points}` + (meu.dicas ? ` (${meu.dicas} dica${meu.dicas > 1 ? 's' : ''})` : '') + (meu.rank === 1 && meu.points ? ' 🥇' : '') : '😶 Você não palpitou'}</div></div>
           <div class="mapBox"><canvas class="mapCv" id="bdMapCv"></canvas></div><p class="muted center" style="margin:0">Próxima bandeira já já…</p>`;
-        bdMapa = criarMapa($('bdMapCv'), null); bdMapa.st.travado = true; bdMapa.st.certo = r.code;
-        if (meu) bdMapa.st.pin = { lon: meu.lon, lat: meu.lat };
+        bdMapa = criarMapa($('bdMapCv'), null); bdMapa.st.travado = true; bdMapa.st.certo = r.code; bdMapa.st.foco = true;
+        if (meu) { bdMapa.st.pin = { lon: meu.lon, lat: meu.lat }; const a = meu.dist > 0 && MAPA.maisProximo(meu.lon, meu.lat, r.code); if (a) bdMapa.st.linha = { lon: meu.lon, lat: meu.lat, lon2: a[0], lat2: a[1], cor: '#ff5d8f' }; }
         const pc = MAPA.porCodigo[r.code];
         requestAnimationFrame(() => {
           if (pc) { const b = pc.bbox.slice(); if (meu) { b[0] = Math.min(b[0], meu.lon); b[2] = Math.max(b[2], meu.lon); b[1] = Math.min(b[1], meu.lat); b[3] = Math.max(b[3], meu.lat); } bdMapa.focar(b); }
@@ -268,6 +273,7 @@ window.CelJogos = (function () {
       body.innerHTML = `<div class="bdMsg" id="bdMsg">📍 Toque no mapa onde fica o país da bandeira</div>
         <div class="mapBox"><canvas class="mapCv" id="bdMapCv"></canvas>
           <div class="mapZoom"><button id="mzIn">＋</button><button id="mzOut">－</button><button id="mzAll">🌍</button></div></div>
+        <div class="bdDicas" id="bdDicas"></div>
         <button class="btn green" id="bdPinGo" disabled>Marque um ponto no mapa</button>
         <div class="row" style="gap:8px"><button class="btn ghost" id="bdHint" style="font-size:15px"></button>${s.me.isMaster ? '<button class="btn ghost" id="bdSkip" style="font-size:15px;flex:0 0 38%">⏭ Pular</button>' : ''}</div>
         <p class="muted center" style="margin:0;font-size:13px">Arraste para mover · dois dedos para zoom · 1 palpite por bandeira</p>`;
@@ -292,7 +298,8 @@ window.CelJogos = (function () {
         $('bdPinGo').disabled = true; $('bdPinGo').textContent = '✔ Palpite enviado';
       }
       const h = $('bdHint');
-      if (h) { h.disabled = g.dicas.length >= g.maxDicas; h.textContent = g.dicas.length >= g.maxDicas ? '💡 Sem mais dicas' : `💡 Dica (−15 pts) · ${g.dicas.length}/${g.maxDicas}`; }
+      const nD = (gp.dicas || []).length; mostrarDicas(gp.dicas);
+      if (h) { h.disabled = nD >= g.maxDicas; h.textContent = nD >= g.maxDicas ? '💡 Sem mais dicas' : `💡 Dica só pra você (−15) · ${nD}/${g.maxDicas}`; }
       if (gp.palpite) { const m = $('bdMsg'); if (m) { m.textContent = `Palpite enviado! ${g.palpitaram}/${g.jogadores} já palpitaram`; m.className = 'bdMsg ok'; } }
     }
   }
@@ -303,12 +310,12 @@ window.CelJogos = (function () {
     if (g.mode === 'mapa') {
       bdReveal = g.revealMs || bdReveal;
       if (g.sub === 'play') bdLocalStart = performance.now() + g.startInMs - g.elapsedMs;
-      $('bdLabel').innerHTML = `🗺️ Bandeira ${g.idx} de ${g.total}<small>${g.dicas.length ? '💡 ' + g.dicas.length + ' dica(s) na TV' : 'marque o país no mapa'}</small>`;
+      $('bdLabel').innerHTML = `🗺️ Bandeira ${g.idx} de ${g.total}<small>marque o país no mapa</small>`;
       return renderBDMapa(s, prev);
     }
     bdReveal = g.revealMs || bdReveal;
     if (g.sub === 'play') bdLocalStart = performance.now() + g.startInMs - g.elapsedMs;
-    $('bdLabel').innerHTML = `🚩 Bandeira ${g.idx} de ${g.total}<small>${g.dicas.length ? '💡 ' + g.dicas.length + ' dica(s) na TV' : 'quem acertar primeiro leva'}</small>`;
+    $('bdLabel').innerHTML = `🚩 Bandeira ${g.idx} de ${g.total}<small>quem acertar primeiro leva</small>`;
     const locked = gp.max > 0 && gp.tentativas >= gp.max;
     const key = g.idx + '|' + g.sub + '|' + locked;
     if (key !== bdKey) {
@@ -326,6 +333,7 @@ window.CelJogos = (function () {
         body.innerHTML = `<div class="bdMsg" id="bdMsg">Digite o nome do país</div>
           <input class="bdIn" id="bdIn" type="text" placeholder="Ex.: Bra…" autocomplete="off" autocorrect="off" spellcheck="false">
           <div class="sugs" id="bdSugs"></div>
+          <div class="bdDicas" id="bdDicas"></div>
           <button class="btn green" id="bdGo" disabled>Escolha um país da lista</button>
           <div class="row" style="gap:8px"><button class="btn ghost" id="bdHint" style="font-size:15px"></button>${s.me.isMaster ? '<button class="btn ghost" id="bdSkip" style="font-size:15px;flex:0 0 38%">⏭ Pular</button>' : ''}</div>
           <p class="muted center" id="bdTries" style="margin:0"></p>`;
@@ -353,7 +361,8 @@ window.CelJogos = (function () {
     }
     if (g.sub === 'play' && !locked) {
       const h = $('bdHint');
-      if (h) { h.disabled = g.dicas.length >= g.maxDicas; h.textContent = g.dicas.length >= g.maxDicas ? '💡 Sem mais dicas' : `💡 Pedir dica (−15 pts) · ${g.dicas.length}/${g.maxDicas}`; }
+      const nD = (gp.dicas || []).length; mostrarDicas(gp.dicas);
+      if (h) { h.disabled = nD >= g.maxDicas; h.textContent = nD >= g.maxDicas ? '💡 Sem mais dicas' : `💡 Pedir dica só pra mim (−15) · ${nD}/${g.maxDicas}`; }
       const t = $('bdTries'); if (t) t.textContent = gp.max ? `Chutes: ${gp.tentativas}/${gp.max}` : `Chutes: ${gp.tentativas} (sem limite)`;
       if ((gp.tentativas || 0) > bdLastTent) {          // errou
         bdLastTent = gp.tentativas;
@@ -381,7 +390,7 @@ window.CelJogos = (function () {
       if (g.mode === 'mapa') { box.textContent = g.sub === 'play' ? `📍 ${g.palpitaram}/${g.jogadores}` : '🏁'; box.className = 'timer'; }
       else if (g.sub === 'play' && bdLocalStart != null) {
         const p = Math.max(0, Math.min(1, (performance.now() - bdLocalStart) / bdReveal));
-        box.textContent = Math.max(10, Math.round(100 - 50 * p - 15 * g.dicas.length)) + ' pts';
+        box.textContent = Math.max(10, Math.round(100 - 50 * p - 15 * ((S.gp && S.gp.dicas) || []).length)) + ' pts';
         box.className = 'timer';
       } else box.textContent = '🏁';
     }

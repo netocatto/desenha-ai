@@ -123,10 +123,12 @@ window.TVJogos = (function () {
   // ------------------------------------------------------------ BANDEIRAS
   const cvb = $('bdc'), gb = cvb.getContext('2d');
   let BW = 640, BH = 480;
+  let bdLargo = false;   // resultado do modo mapa usa toda a área (não só 4:3)
   function bdResize() {
-    const side = document.querySelector('.bdSide').getBoundingClientRect().width || window.innerWidth * 0.2;
-    const maxW = window.innerWidth - side - window.innerWidth * 0.045, maxH = window.innerHeight * 0.95;
-    BW = Math.floor(Math.min(maxW, maxH * 4 / 3)); BH = Math.round(BW * 3 / 4);
+    const side = document.querySelector('.bdSide').getBoundingClientRect().width || window.innerWidth * 0.16;
+    const maxW = window.innerWidth - side - window.innerWidth * 0.03, maxH = window.innerHeight * 0.965;
+    if (bdLargo) { BW = Math.floor(maxW); BH = Math.floor(maxH); }
+    else { BW = Math.floor(Math.min(maxW, maxH * 4 / 3)); BH = Math.round(BW * 3 / 4); }
     const dpr = window.devicePixelRatio || 1;
     cvb.style.width = BW + 'px'; cvb.style.height = BH + 'px'; cvb.width = Math.round(BW * dpr); cvb.height = Math.round(BH * dpr);
     gb.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -193,19 +195,60 @@ window.TVJogos = (function () {
     gb.fillStyle = 'rgba(255,255,255,.18)'; gb.font = `800 ${BH * 0.4}px 'Baloo 2', sans-serif`; gb.textAlign = 'center'; gb.textBaseline = 'middle';
     gb.fillText('?', BW / 2, BH / 2);
   }
-  let bdMapRes = null;   // modo mapa: resultado desenhado no lugar da bandeira
-  function desenharMapaResultado(r) {
-    const pc = window.MAPA && MAPA.porCodigo[r.code];
-    const pins = (r.palpites || []).map(p => ({ lon: p.lon, lat: p.lat, cor: avColor(p.pid), rotulo: p.name, raio: Math.max(9, BH / 45) }));
+  let bdMapRes = null, bdMapAnim = null;   // modo mapa: resultado desenhado no lugar da bandeira
+  function prepararMapaResultado(r) {
+    const pc = MAPA.porCodigo[r.code];
+    // foco no país certo: enquadra o país (com folga) e só os palpites que estão por perto
     let box = pc ? pc.bbox.slice() : [-170, -58, 190, 84];
-    pins.forEach(p => { box[0] = Math.min(box[0], p.lon); box[2] = Math.max(box[2], p.lon); box[1] = Math.min(box[1], p.lat); box[3] = Math.max(box[3], p.lat); });
-    const v = MAPA.encaixar(BW, BH, box, 0.18);
-    const m = MAPA.mundo(BW, BH); if (v.s < m.s) { v.s = m.s; v.cx = m.cx; v.cy = m.cy; }
-    gb.save(); MAPA.desenhar(gb, BW, BH, v, { certo: r.code, pinos: pins }); gb.restore();
+    const cxp = (box[0] + box[2]) / 2;
+    const ps = (r.palpites || []).map(p => {
+      const lon = p.lon + 360 * Math.round((cxp - p.lon) / 360);             // lado do mundo mais perto do país
+      const alvo = MAPA.maisProximo(p.lon, p.lat, r.code) || [cxp, p.lat];
+      const alon = alvo[0] + 360 * Math.round((lon - alvo[0]) / 360);
+      return Object.assign({}, p, { lonW: lon, alvo: [alon, alvo[1]] });
+    });
+    ps.forEach(p => { if (p.dist <= 2500) { box[0] = Math.min(box[0], p.lonW); box[2] = Math.max(box[2], p.lonW); box[1] = Math.min(box[1], p.lat); box[3] = Math.max(box[3], p.lat); } });
+    const mw = Math.max(0, 22 - (box[2] - box[0])) / 2, mh = Math.max(0, 14 - (box[3] - box[1])) / 2;
+    box = [box[0] - mw, box[1] - mh, box[2] + mw, box[3] + mh];
+    const fim = MAPA.encaixar(BW, BH * 0.74, box, 0.1);       // deixa a parte de baixo livre para o placar
+    fim.cy += BH * 0.13 / fim.s;
+    const m = MAPA.mundo(BW, BH); if (fim.s < m.s) { fim.s = m.s; fim.cx = m.cx; fim.cy = m.cy; }
+    bdMapAnim = { t0: performance.now() + 700, ini: m, fim, ps };
+  }
+  const corPino = (pid) => { const c = avColor(pid); return /^#(3ee08f|2ec27e|4ade80|22c55e|3ddc84)$/i.test(c) ? '#e879f9' : c; };   // verde é a cor do país certo
+  function desenharMapaResultado(now) {
+    const A = bdMapAnim, r = bdMapRes; if (!A) return true;
+    const t = Math.max(0, Math.min(1, (now - A.t0) / 1800)), e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    const v = { s: A.ini.s * Math.pow(A.fim.s / A.ini.s, e), cx: A.ini.cx + (A.fim.cx - A.ini.cx) * e, cy: A.ini.cy + (A.fim.cy - A.ini.cy) * e };
+    const raio = Math.max(10, BH / 40);
+    const pinos = t < 1 ? [] : A.ps.map(p => ({ lon: p.lonW, lat: p.lat, cor: corPino(p.pid), rotulo: p.name, raio }));
+    const linhas = t < 1 ? [] : A.ps.filter(p => p.dist > 0).map(p => ({ lon: p.lonW, lat: p.lat, lon2: p.alvo[0], lat2: p.alvo[1], cor: corPino(p.pid) }));
+    gb.save(); MAPA.desenhar(gb, BW, BH, v, { certo: r.code, foco: true, pinos, linhas }); gb.restore();
+    if (t >= 1) {
+      // palpites fora da tela: etiqueta na borda, na direção do palpite
+      const M = 14, x0 = M, y0 = M, x1 = BW - M, y1 = BH * 0.74;       // acima do placar de baixo
+      A.ps.forEach(p => {
+        const [px, py] = MAPA.geoParaTela(v, BW, BH, p.lonW, p.lat), [ax, ay] = MAPA.geoParaTela(v, BW, BH, p.alvo[0], p.alvo[1]);
+        if (px >= x0 && px <= x1 && py >= y0 && py <= y1) return;
+        let k = 1; const dx = px - ax, dy = py - ay;
+        if (dx) k = Math.min(k, dx > 0 ? (x1 - ax) / dx : (x0 - ax) / dx);
+        if (dy) k = Math.min(k, dy > 0 ? (y1 - ay) / dy : (y0 - ay) / dy);
+        const ex = ax + dx * k, ey = ay + dy * k;
+        const txt = `${p.name} · ${p.dist.toLocaleString('pt-BR')} km`;
+        gb.save(); gb.font = `800 ${Math.round(BH / 34)}px 'Baloo 2', system-ui, sans-serif`;
+        const tw = gb.measureText(txt).width + 18, th = BH / 22;
+        const bx = Math.max(4, Math.min(BW - tw - 4, ex - tw / 2)), by = Math.max(4, Math.min(y1 - th, ey - th / 2));
+        gb.fillStyle = corPino(p.pid); gb.strokeStyle = '#1b1440'; gb.lineWidth = 3;
+        gb.beginPath(); gb.roundRect ? gb.roundRect(bx, by, tw, th, th / 2) : gb.rect(bx, by, tw, th); gb.fill(); gb.stroke();
+        gb.fillStyle = '#1b1440'; gb.textAlign = 'center'; gb.textBaseline = 'middle'; gb.fillText(txt, bx + tw / 2, by + th / 2 + 1);
+        gb.restore();
+      });
+    }
+    return t >= 1;
   }
   function quadro(now) {
     if (!$('s-bd').classList.contains('on')) return requestAnimationFrame(quadro);
-    if (bdMapRes) return requestAnimationFrame(quadro);           // mapa já desenhado
+    if (bdMapRes) { if (bdMapAnim && !bdMapAnim.feito) bdMapAnim.feito = desenharMapaResultado(now); return requestAnimationFrame(quadro); }
     fundo();
     if (bdImg && bdImg.complete && bdImg.naturalWidth && plano && bdLocalStart != null) {
       const p = bdResult ? 1 : Math.max(0, Math.min(1, (now - bdLocalStart) / bdReveal));
@@ -218,7 +261,7 @@ window.TVJogos = (function () {
       gb.restore();
       // pontos e barra caindo junto com a revelação
       if (S && S.g && S.g.kind === 'bd' && !bdResult) {
-        if (S.g.mode !== 'mapa') { const pts = Math.max(10, Math.round(100 - 50 * p - 15 * (S.g.dicas || []).length)); $('bdPts').textContent = pts; }
+        if (S.g.mode !== 'mapa') { const pts = Math.max(10, Math.round(100 - 50 * p)); $('bdPts').textContent = pts; }
         $('bdBarFill').style.width = (p * 100).toFixed(1) + '%';
       }
       $('bdWait').classList.toggle('on', now < bdLocalStart);
@@ -230,7 +273,8 @@ window.TVJogos = (function () {
 
   es.addEventListener('bdFlag', (e) => {
     const f = JSON.parse(e.data); if (!f) return;
-    bdFlag = f; bdResult = null; bdMapRes = null; bdReveal = f.revealMs;
+    bdFlag = f; bdResult = null; bdMapRes = null; bdMapAnim = null; bdReveal = f.revealMs;
+    if (bdLargo) { bdLargo = false; bdResize(); }
     bdLocalStart = performance.now() - f.elapsedMs;
     plano = montarPlano(f);
     bdImg = new Image();
@@ -241,7 +285,7 @@ window.TVJogos = (function () {
   es.addEventListener('bdResult', (e) => {
     const r = JSON.parse(e.data); bdResult = r;
     if (r.modo === 'mapa' && window.MAPA) {
-      bdMapRes = r; desenharMapaResultado(r);
+      bdMapRes = r; bdLargo = true; bdResize(); prepararMapaResultado(r);
       const med = ['🥇', '🥈', '🥉'];
       const linhas = (r.palpites || []).slice(0, 4).map((p, i) => `<div class="win" >${med[i] || (i + 1) + 'º'} ${avatarHTML(p.pid, p.name)} ${esc(p.name)} — ${p.dist === 0 ? 'no país!' : p.dist.toLocaleString('pt-BR') + ' km'} <span style="color:var(--green)">+${p.points}</span></div>`).join('');
       $('bdOverlay').innerHTML = `<div class="nm" style="font-size:6vh">${esc(r.nome)}</div>` + (linhas || '<div class="win">😶 Ninguém palpitou</div>');
@@ -264,17 +308,13 @@ window.TVJogos = (function () {
   }
   es.addEventListener('bdWrong', (e) => { const d = JSON.parse(e.data); toast(`❌ ${d.name} chutou ${d.nome}`); SFX.wrong(); });
   es.addEventListener('bdPinned', (e) => { const d = JSON.parse(e.data); toast(`📍 ${d.name} palpitou`, 'hint'); SFX.join(); });
-  es.addEventListener('bdHint', (e) => { const d = JSON.parse(e.data); toast(`💡 ${d.by} pediu uma dica`, 'hint'); SFX.hint(); });
+  es.addEventListener('bdHint', (e) => { const d = JSON.parse(e.data); toast(`💡 ${d.by} pediu uma dica (−15 só para quem pediu)`, 'hint'); SFX.hint(); });
 
   function renderBD(s, prev) {
     const first = !$('s-bd').classList.contains('on');
     show('s-bd'); if (first) bdResize();
     const g = s.g;
     $('bdIdx').textContent = `Bandeira ${g.idx} de ${g.total}`;
-    const hs = $('bdHints');
-    const n = (g.dicas || []).length;
-    if (!n) hs.innerHTML = '<div class="none">Nenhuma ainda — cada dica vale −15 pontos</div>';
-    else if (hs.children.length !== n || hs.querySelector('.none')) hs.innerHTML = g.dicas.map(d => `<div class="h">${esc(d)}</div>`).join('');
     const sc = $('bdScores'); sc.innerHTML = '';
     sc.classList.toggle('many', s.players.length > 8);
     const ord = [...s.players].sort((a, b) => b.score - a.score);

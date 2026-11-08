@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Desenha Aí! — TV (online)</title>
-<script src="qrcode.js?v=202611081000"></script>
+<script src="qrcode.js?v=202611081030"></script>
 <style>
   @font-face { font-family: 'Baloo 2'; src: url('fonts/Baloo2.ttf') format('truetype'); font-weight: 400 800; font-display: swap; }
   :root { --bg: #1b1440; --bg2: #271d5c; --card: #2f2470; --ink: #fff; --muted: #b9b0e6;
@@ -141,7 +141,7 @@
   @keyframes msgIn { from { transform: translateY(3vh); opacity: 0 } to { transform: none; opacity: 1 } }
 
   /* ---------- Bandeiras ---------- */
-  #s-bd { padding: 2vh 1.5vw; gap: 1.5vw; align-items: center; justify-content: center; }
+  #s-bd { padding: 1vh 1vw; gap: 1vw; align-items: center; justify-content: center; }
   .bdMain { position: relative; flex: 0 0 auto; }
   #bdc { display: block; border-radius: 2vh; background: #2f2470; box-shadow: 0 1.6vh 0 rgba(0,0,0,.35), 0 0 0 .8vh var(--card); }
   .bdWait { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; font-size: 7vh; font-weight: 800; text-align: center; }
@@ -156,6 +156,8 @@
   .bdOverlay .cap { font-size: 2.6vh; color: var(--muted); font-weight: 700; }
   .bdOverlay .win { font-size: 4vh; font-weight: 800; display: flex; align-items: center; gap: 1.2vh; }
   .bdOverlay .win .av { width: 7vh; height: 7vh; font-size: 3.4vh; }
+  .bdSide { width: 16vw; min-width: 170px; }
+  .bdSide .logo { font-size: 3.4vh !important; }
   .bdPts { font-size: 8vh; font-weight: 800; color: var(--yellow); line-height: 1; }
   .bdPts small { font-size: 2.6vh; color: var(--muted); }
   .bdBar { height: 1.2vh; background: var(--bg2); border-radius: 999px; overflow: hidden; margin-top: 1vh; }
@@ -174,7 +176,7 @@
   @keyframes drop { from { transform: translate(-50%, -200%) } to { transform: translate(-50%, 0) } }
   @keyframes flash { 0% { opacity: .5 } 100% { opacity: 0 } }
 </style>
-<script>(function(){var B="202611081000";function chk(force){fetch("versao.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){if(!j||j.build===B||new URLSearchParams(location.search).get("_v")===j.build)return;var livre=true;try{livre=!S||((S.phase==="lobby"||!S.phase)&&!(S.players||[]).length)}catch(e){}if(force||livre){var u=new URL(location.href);u.searchParams.set("_v",j.build);location.replace(u.toString())}}).catch(function(){})}chk(true);setInterval(function(){chk(false)},120000)})();</script>
+<script>(function(){var B="202611081030";function chk(force){fetch("versao.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){if(!j||j.build===B||new URLSearchParams(location.search).get("_v")===j.build)return;var livre=true;try{livre=!S||((S.phase==="lobby"||!S.phase)&&!(S.players||[]).length)}catch(e){}if(force||livre){var u=new URL(location.href);u.searchParams.set("_v",j.build);location.replace(u.toString())}}).catch(function(){})}chk(true);setInterval(function(){chk(false)},120000)})();</script>
 </head>
 <body>
 
@@ -244,10 +246,9 @@
     <div class="bdOverlay" id="bdOverlay"></div>
   </div>
   <div class="side bdSide">
-    <div class="logo" style="font-size:4.2vh"><span class="a">Jogo das</span> <span class="b">Bandeiras</span></div>
+    <div class="logo"><span class="a">Jogo das</span> <span class="b">Bandeiras</span></div>
     <div class="info"><div class="k" id="bdIdx">Bandeira</div><div class="bdPts"><span id="bdPts">100</span><small> pts</small></div>
       <div class="bdBar"><div id="bdBarFill"></div></div></div>
-    <div class="info"><div class="k">Dicas</div><div class="bdHints" id="bdHints"></div></div>
     <div class="scores" id="bdScores"></div>
   </div>
   <div class="bdToast" id="bdToast"></div>
@@ -260,20 +261,20 @@
   <div class="rest" id="rest"></div>
 </section>
 
-<script src="paises.js?v=202611081000"></script>
-<script src="bandeiras-svg.js?v=202611081000"></script>
-<script src="mapa-dados.js?v=202611081000"></script>
-<script src="mapa.js?v=202611081000"></script>
+<script src="paises.js?v=202611081030"></script>
+<script src="bandeiras-svg.js?v=202611081030"></script>
+<script src="mapa-dados.js?v=202611081030"></script>
+<script src="mapa.js?v=202611081030"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=202611081000"></script>
-<script src="palavras.js?v=202611081000"></script>
-<script src="telefone.js?v=202611081000"></script>
-<script src="bandeiras.js?v=202611081000"></script>
-<script src="core.js?v=202611081000"></script>
-<script src="online.js?v=202611081000"></script>
-<script src="tv.js?v=202611081000"></script>
-<script src="tv-jogos.js?v=202611081000"></script>
+<script src="firebase-config.js?v=202611081030"></script>
+<script src="palavras.js?v=202611081030"></script>
+<script src="telefone.js?v=202611081030"></script>
+<script src="bandeiras.js?v=202611081030"></script>
+<script src="core.js?v=202611081030"></script>
+<script src="online.js?v=202611081030"></script>
+<script src="tv.js?v=202611081030"></script>
+<script src="tv-jogos.js?v=202611081030"></script>
 </body>
 </html>
