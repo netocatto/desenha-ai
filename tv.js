@@ -118,7 +118,9 @@ const Music = (() => {
     if (mode && !timerId) { nextTime = t + 0.05; step = 0; timerId = setInterval(tick, 25); }
     if (!mode && timerId) { clearInterval(timerId); timerId = null; }
   }
-  return { set, get mode() { return mode; }, get bpm() { return mode ? Math.round(bpm(Math.max(0, Math.min(1, urgencyFn())))) : 0; } };
+  // baixa a música enquanto o narrador fala
+  function duck(on) { if (!out || !actx) return; const t = actx.currentTime; out.gain.cancelScheduledValues(t); out.gain.setTargetAtTime(mode ? (on ? 0.04 : 0.2) : 0, t, 0.12); }
+  return { set, duck, get mode() { return mode; }, get bpm() { return mode ? Math.round(bpm(Math.max(0, Math.min(1, urgencyFn())))) : 0; } };
 })();
 
 function musicMode(s) {

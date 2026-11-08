@@ -8,68 +8,62 @@ window.TVJogos = (function () {
   let tfLocalEnd = null, bdLocalStart = null, bdReveal = 20000, bdFlag = null, bdImg = null, bdResult = null;
 
   // ------------------------------------------------------------ narração (voz na TV)
-  // App Android: voz do próprio aparelho (AndroidVoz). PC/navegador: voz do sistema (speechSynthesis).
-  // Cada jogador ganha um "jeito de falar" (tom e velocidade) para a leitura ficar divertida.
-  let voz = null, vozLigada = true;
-  try { vozLigada = localStorage.getItem('desenha-voz') !== '0'; } catch (e) {}
-  function pickVoice() {
-    if (!window.speechSynthesis) return;
-    const vs = speechSynthesis.getVoices().filter(v => /^pt/i.test(v.lang));
-    voz = vs.find(v => /pt[-_]BR/i.test(v.lang) && /google|natural|online|francisca|antonio|maria|luciana/i.test(v.name))
-      || vs.find(v => /pt[-_]BR/i.test(v.lang)) || vs[0] || null;
+  // Voz própria do jogo (eSpeak em português, num Web Worker) tocada pelo mesmo som da música:
+  // funciona sozinha no PC, no app Android e no site — sem botão. Ela lê "do jeito dela" (é parte da graça).
+  // Cada jogador ganha uma voz diferente (homem, mulher, rouca, robô, sussurro…).
+  const VARIANTES = ['m1', 'f2', 'm3', 'f4', 'croak', 'm7', 'f1', 'klatt', 'm5', 'f5', 'm2', 'whisperf', 'm6', 'f3', 'klatt2', 'm4'];
+  const NARRADOR = { variant: 'm3', pitch: 45, speed: 160, amplitude: 120 };
+  let vozWorker = null, vozSeq = 0, vozGeracao = 0, vozFim = 0, vozFila = Promise.resolve(), vozFontes = [];
+  const vozPend = {};
+  function vozIniciar() {
+    if (vozWorker || !window.Worker) return;
+    try {
+      vozWorker = new Worker('voz-worker.js?v=1');
+      vozWorker.onmessage = (e) => { const f = vozPend[e.data.id]; delete vozPend[e.data.id]; if (f) f(e.data.wav); };
+      vozWorker.onerror = () => { Object.keys(vozPend).forEach(k => { vozPend[k](null); delete vozPend[k]; }); };
+    } catch (e) { vozWorker = null; }
   }
-  if (window.speechSynthesis) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
-  const temVoz = () => !!(window.AndroidVoz || window.speechSynthesis);
   function jeito(pid) {
-    if (!pid) return { pitch: 1.05, rate: 1.02 };
+    if (!pid) return NARRADOR;
     let h = 7; for (const ch of String(pid)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-    return { pitch: 0.8 + (h % 9) * 0.07, rate: 0.95 + ((h >> 4) % 5) * 0.04 };
+    return { variant: VARIANTES[h % VARIANTES.length], pitch: 30 + ((h >> 5) % 50), speed: 150 + ((h >> 9) % 40), amplitude: 120 };
+  }
+  function gerar(texto, opts) {
+    return new Promise((ok) => {
+      vozIniciar(); if (!vozWorker) return ok(null);
+      const id = ++vozSeq; vozPend[id] = ok;
+      vozWorker.postMessage({ id, texto, opts: Object.assign({}, opts) });
+      setTimeout(() => { if (vozPend[id]) { delete vozPend[id]; ok(null); } }, 15000);
+    });
   }
   function narrar(texto, pid) {
-    if (!vozLigada || !texto) return;
-    const j = jeito(pid);
-    if (window.AndroidVoz) { try { AndroidVoz.falar(String(texto), j.pitch, j.rate); } catch (e) {} return; }
-    if (!window.speechSynthesis) return;
-    try {
-      if (navigator.userActivation && !navigator.userActivation.hasBeenActive) avisoVoz(true);
-      const u = new SpeechSynthesisUtterance(texto);
-      u.lang = 'pt-BR'; if (voz) u.voice = voz; u.rate = j.rate; u.pitch = j.pitch;
-      speechSynthesis.resume(); speechSynthesis.speak(u);
-    } catch (e) { /* sem voz neste aparelho */ }
+    texto = String(texto || '').trim(); if (!texto) return;
+    const ger = vozGeracao, opts = jeito(pid);
+    const pronto = gerar(texto, opts);                       // gera já (em paralelo) e toca na ordem
+    vozFila = vozFila.then(() => pronto).then((wav) => {
+      if (!wav || ger !== vozGeracao || typeof actx === 'undefined' || !actx) return;
+      if (actx.state === 'suspended') actx.resume();
+      return new Promise((ok) => actx.decodeAudioData(wav, ok, () => ok(null))).then((buf) => {
+        if (!buf || ger !== vozGeracao) return;
+        const src = actx.createBufferSource(), g = actx.createGain();
+        src.buffer = buf; g.gain.value = 1.6; src.connect(g).connect(actx.destination);
+        const t = Math.max(actx.currentTime + 0.05, vozFim);
+        src.start(t); vozFim = t + buf.duration + 0.18;
+        vozFontes.push(src); src.onended = () => { vozFontes = vozFontes.filter(x => x !== src); if (!vozFontes.length && typeof Music !== 'undefined' && Music.duck) Music.duck(false); };
+        if (typeof Music !== 'undefined' && Music.duck) Music.duck(true);
+      });
+    }).catch(() => {});
   }
-  function calar() { try { if (window.AndroidVoz) AndroidVoz.parar(); else if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {} }
-  // navegadores só deixam falar depois de um clique/tecla na página: um aviso pede isso uma vez
-  function avisoVoz(on) {
-    let el = document.getElementById('vozAviso');
-    if (!el) {
-      el = document.createElement('button'); el.id = 'vozAviso';
-      el.style.cssText = 'position:fixed;left:50%;top:2vh;transform:translateX(-50%);z-index:50;border:0;border-radius:999px;padding:1.2vh 3vh;font:800 2.6vh "Baloo 2",system-ui,sans-serif;background:#ffd23f;color:#1b1440;box-shadow:0 .6vh 0 rgba(0,0,0,.35);cursor:pointer;display:none';
-      el.textContent = '🔊 Clique aqui para ligar a voz do narrador';
-      document.body.appendChild(el);
-    }
-    el.style.display = on ? '' : 'none';
-  }
-  ['pointerdown', 'keydown'].forEach(ev => window.addEventListener(ev, () => {
-    const el = document.getElementById('vozAviso'); if (el && el.style.display !== 'none') { el.style.display = 'none'; narrar('Narrador ligado!'); }
-  }, { capture: true }));
-  // botão para ligar/desligar a voz (canto da TV, no Telefone sem fio)
-  function botaoVoz() {
-    let b = document.getElementById('vozBtn');
-    if (!b) {
-      b = document.createElement('button'); b.id = 'vozBtn';
-      b.style.cssText = 'position:fixed;right:1.5vw;bottom:2vh;z-index:40;border:0;border-radius:1.4vh;padding:.8vh 1.6vh;font:800 2.2vh "Baloo 2",system-ui,sans-serif;background:rgba(255,255,255,.12);color:#fff;cursor:pointer';
-      b.onclick = () => { vozLigada = !vozLigada; try { localStorage.setItem('desenha-voz', vozLigada ? '1' : '0'); } catch (e) {} if (!vozLigada) calar(); else narrar('Narrador ligado!'); botaoVoz(); };
-      document.body.appendChild(b);
-    }
-    b.textContent = vozLigada ? '🔊 Voz ligada' : '🔇 Voz desligada';
-    b.style.display = temVoz() && $('s-tf').classList.contains('on') ? '' : 'none';
+  function calar() {
+    vozGeracao++; vozFim = 0;
+    vozFontes.forEach(s => { try { s.stop(); } catch (e) {} }); vozFontes = [];
+    if (typeof Music !== 'undefined' && Music.duck) Music.duck(false);
   }
 
   // ------------------------------------------------------------ TELEFONE
   const TITLES = { write: '✍️ Todo mundo escrevendo uma frase…', draw: '🎨 Hora de desenhar!', guess: '🔎 O que será esse desenho?' };
-  setInterval(botaoVoz, 1000);
   function renderTF(s, prev) {
-    show('s-tf'); botaoVoz();
+    show('s-tf'); vozIniciar();
     const g = s.g;
     $('tfPlay').classList.toggle('on', g.sub === 'play');
     $('tfAlbum').classList.toggle('on', g.sub === 'album');
