@@ -102,12 +102,12 @@ window.CelJogos = (function () {
         if (tfSent) return wait('✔ Desenho enviado!', `Aguardando os outros: ${g.done.length}/${g.participants.length}`, true);
         const fresh = current !== 's-draw';
         show('s-draw');
-        $('miniWord').innerHTML = `🎨 ${esc(gp.prompt || '…')}<small>Desenhe isso · etapa ${g.step}/${g.steps}</small>`;
+        $('miniWord').innerHTML = `🎨 ${esc(gp.prompt || '…')}<small>Desenhe isso · etapa ${g.etapa || g.step}/${g.etapas || g.steps}</small>`;
         if (fresh) requestAnimationFrame(resizePad);
         return;
       }
       show('s-tf');
-      $('tfLabel').innerHTML = `${LABEL[g.type]}<small>Rodada ${g.round}/${g.rounds} · etapa ${g.step}/${g.steps}</small>`;
+      $('tfLabel').innerHTML = `${LABEL[g.type]}<small>Rodada ${g.round}/${g.rounds} · etapa ${g.etapa || g.step}/${g.etapas || g.steps}</small>`;
       const bodyKey = 'in|' + key;
       if ($('tfBody').dataset.key !== bodyKey) {
         $('tfBody').dataset.key = bodyKey;
@@ -240,10 +240,16 @@ window.CelJogos = (function () {
     return {
       st, desenhar, zoom,
       reset() { st.v = null; desenhar(); },
-      focar(box) { const [w, h] = tam(); st.v = MAPA.encaixar(w, h, box, 0.25); limitar(); desenhar(); },
+      focar(box, margem) { const [w, h] = tam(); st.v = MAPA.encaixar(w, h, box, margem == null ? 0.25 : margem); limitar(); desenhar(); },
     };
   }
-  let bdMapa = null;
+  let bdMapa = null, bdFocoCont = null;
+  // dica do continente no modo mapa: o mapa daquela pessoa aproxima no continente
+  const CONTINENTES = {
+    'Ásia': [25, -11, 150, 56], 'África': [-18, -35, 52, 38], 'Europa': [-25, 34, 45, 71],
+    'América Central e Caribe': [-92, 7, -59, 27], 'América do Sul': [-82, -56, -34, 13],
+    'Oceania': [110, -48, 190, 2], 'América do Norte': [-170, 14, -50, 72],
+  };
   function mostrarDicas(lista) {
     const el = $('bdDicas'); if (!el) return; lista = lista || [];
     if (el.children.length === lista.length) return;
@@ -293,6 +299,11 @@ window.CelJogos = (function () {
       requestAnimationFrame(() => bdMapa.desenhar());
     }
     if (g.sub === 'play') {
+      if (gp.continente && bdFocoCont !== key + gp.continente && CONTINENTES[gp.continente]) {
+        bdFocoCont = key + gp.continente;
+        requestAnimationFrame(() => bdMapa.focar(CONTINENTES[gp.continente], 0.03));
+        const m = $('bdMsg'); if (m && !gp.palpite) m.textContent = `🌍 Aproximei na ${gp.continente} — toque onde fica o país`;
+      }
       if (gp.palpite && !bdMapa.st.travado) {          // já palpitou (ex.: voltou para a página)
         bdMapa.st.pin = gp.palpite; bdMapa.st.travado = true; bdMapa.desenhar();
         $('bdPinGo').disabled = true; $('bdPinGo').textContent = '✔ Palpite enviado';

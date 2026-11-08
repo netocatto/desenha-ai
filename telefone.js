@@ -51,6 +51,7 @@
     let part = [];             // participantes (ordem sorteada)
     let chains = [];           // chains[c] = { owner, items: [ {type, pid, text|strokes, sim?} ] }
     let step = 0, steps = 0;
+    let inicio = 0;            // 1 quando o jogo sorteia a frase inicial (partida com 2 pessoas)
     let sub = 'play';          // play | album | summary
     let endsAt = null, timer = null;
     let done = new Set();
@@ -71,8 +72,17 @@
       if (!part.length) part = ctx.order();
       chains = part.map(pid => ({ owner: pid, items: [] }));
       const n = part.length;
-      steps = Math.max(1, Math.min(n, S.tfSteps || n));
       sub = 'play'; album = { chain: 0, item: -1, auto: album.auto };
+      if (n === 2) {
+        // só 2 pessoas: o jogo sorteia uma frase/palavra, um desenha e o outro adivinha
+        inicio = 1; steps = 3;
+        chains.forEach(c => { c.items[0] = { type: 'write', pid: null, text: ctx.palavra ? ctx.palavra() : 'um gato de chapéu' }; });
+        return startStep(1);
+      }
+      inicio = 0;
+      steps = Math.max(1, Math.min(n, S.tfSteps || n));
+      // a rodada sempre termina com alguém adivinhando um desenho, nunca desenhando
+      if (steps > 1 && typeOf(steps - 1) === 'draw') steps -= 1;
       startStep(0);
     }
     function startStep(k) {
@@ -127,7 +137,7 @@
         });
         // bônus da corrente: a última frase ainda lembra a primeira?
         const last = c.items[c.items.length - 1];
-        if (last && last.type === 'guess' && c.items.length > 2) {
+        if (last && last.type === 'guess' && c.items.length > 3) {
           const s = Math.round(similarity(last.text, c.items[0].text) * 50);
           c.bonus = s; add(c.owner, s);
         }
@@ -161,7 +171,8 @@
       }
     }
     function publicItem(it, withStrokes, chain, index) {
-      const o = { type: it.type, pid: it.pid, name: ctx.nameOf(it.pid), index, chain };
+      const o = { type: it.type, pid: it.pid, name: it.pid ? ctx.nameOf(it.pid) : 'O jogo', index, chain };
+      if (!it.pid) o.sistema = true;
       if (it.text != null) o.text = it.text;
       if (it.sim != null) o.sim = it.sim;
       if (withStrokes && it.strokes) o.strokes = it.strokes;
@@ -237,6 +248,7 @@
         const t = typeOf(step);
         return {
           kind: 'tf', sub, round, rounds: S.tfRounds, step: step + 1, steps, type: t,
+          etapa: step + 1 - inicio, etapas: steps - inicio,
           remainingMs: endsAt ? Math.max(0, endsAt - Date.now()) : null,
           participants: part, done: Array.from(done),
           album: sub === 'play' ? null : { chain: album.chain + 1, chains: chains.length, item: album.item + 1,

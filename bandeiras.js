@@ -161,7 +161,9 @@
       playerView(pid) {
         const p = atual ? PAISES.porCodigo[atual.code] : null, n = dicasDe[pid] || 0;
         return { tentativas: tentativas[pid] || 0, max: S.bdAttempts,
-          dicas: p && sub === 'play' ? Array.from({ length: n }, (_, i) => dicaTexto(i, p)) : [], palpite: palpites[pid] ? { lon: palpites[pid].lon, lat: palpites[pid].lat } : null };
+          dicas: p && sub === 'play' ? Array.from({ length: n }, (_, i) => dicaTexto(i, p)) : [],
+          continente: p && sub === 'play' && n >= 1 ? p.continente : null,     // modo mapa: o celular aproxima nesse continente
+          palpite: palpites[pid] ? { lon: palpites[pid].lon, lat: palpites[pid].lat } : null };
       },
     };
   }

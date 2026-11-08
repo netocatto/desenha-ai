@@ -270,6 +270,7 @@
       stopModulo();
       game.phase = 'play';
       const ctx = {
+        palavra: () => pickWord().w,
         players, settings: game.settings, log,
         order: () => order.slice(),
         connected: () => order.filter(pid => { const p = players.get(pid); return p && p.conns > 0; }),

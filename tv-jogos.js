@@ -70,7 +70,7 @@ window.TVJogos = (function () {
     $('tfSum').classList.toggle('on', g.sub === 'summary');
     if (g.sub === 'play') {
       tfLocalEnd = g.remainingMs != null ? performance.now() + g.remainingMs : null;
-      $('tfStep').textContent = `Rodada ${g.round}/${g.rounds} · etapa ${g.step} de ${g.steps}`;
+      $('tfStep').textContent = `Rodada ${g.round}/${g.rounds} · etapa ${g.etapa || g.step} de ${g.etapas || g.steps}`;
       $('tfTitle').textContent = TITLES[g.type];
       const grid = $('tfGrid'); grid.innerHTML = '';
       g.participants.forEach(pid => {
@@ -107,7 +107,7 @@ window.TVJogos = (function () {
     const p = playerById(it.pid) || { name: it.name };
     const m = document.createElement('div');
     m.className = 'msg' + (it.index % 2 ? ' r' : '');
-    const who = it.type === 'write' ? 'escreveu' : it.type === 'draw' ? 'desenhou' : 'achou que era';
+    const who = it.sistema ? 'sorteou' : it.type === 'write' ? 'escreveu' : it.type === 'draw' ? 'desenhou' : 'achou que era';
     const b = document.createElement('div'); b.className = 'bubble ' + it.type;
     b.innerHTML = `<div class="who">${esc(p.name || it.name)} ${who}</div>`;
     if (it.type === 'draw') {
@@ -120,14 +120,15 @@ window.TVJogos = (function () {
       const t = document.createElement('div'); t.className = 'txt'; t.textContent = it.text || '…'; b.appendChild(t);
       if (it.type === 'guess' && it.sim != null) { const sm = document.createElement('div'); sm.className = 'sim'; sm.textContent = `🎯 ${it.sim}% parecido`; b.appendChild(sm); }
     }
-    m.innerHTML = avatarHTML(it.pid, p.name);
+    m.innerHTML = it.sistema ? '<div class="av" style="background:#ffd23f;display:grid;place-items:center">🎲</div>' : avatarHTML(it.pid, p.name);
     m.appendChild(b);
     chat.appendChild(m);
     // mantém só as últimas mensagens visíveis (estilo chat)
     while (chat.children.length > 4) chat.removeChild(chat.firstChild);
     if (animar) {
       const nome = p.name || it.name;
-      if (it.type === 'write') { narrar(`${nome} escreveu:`); narrar(it.text, it.pid); }
+      if (it.sistema) { narrar('O jogo sorteou:'); narrar(it.text); }
+      else if (it.type === 'write') { narrar(`${nome} escreveu:`); narrar(it.text, it.pid); }
       else if (it.type === 'draw') narrar(`E ${nome} desenhou isso!`);
       else { narrar(`${nome} achou que era:`); narrar(it.text, it.pid); }
     }
@@ -332,7 +333,6 @@ window.TVJogos = (function () {
       $('bdOverlay').innerHTML = `<div class="nm" style="font-size:6vh">${esc(r.nome)}</div>` + (linhas || '<div class="win">😶 Ninguém palpitou</div>');
       $('bdOverlay').classList.add('on', 'mapa');
       (r.palpites || []).length && r.palpites[0].points ? SFX.right() : SFX.timeup();
-      narrar(`Era ${r.nome}!` + (r.palpites && r.palpites[0] && r.palpites[0].points ? ` ${r.palpites[0].name} chegou mais perto.` : ''));
       return;
     }
     $('bdOverlay').classList.remove('mapa');
@@ -340,7 +340,6 @@ window.TVJogos = (function () {
       (r.winner ? `<div class="win">${avatarHTML(r.winner, r.winnerName)} ${esc(r.winnerName)} acertou! <span style="color:var(--green)">+${r.points}</span></div>` : '<div class="win">😶 Ninguém acertou</div>');
     $('bdOverlay').classList.add('on');
     r.winner ? SFX.right() : SFX.timeup();
-    narrar(r.winner ? `${r.nome}! ${r.winnerName} acertou.` : `Era ${r.nome}.`);
   });
   let toastT = null;
   function toast(t, cls) {
