@@ -223,7 +223,8 @@ window.TVJogos = (function () {
     bdFlag = f; bdResult = null; bdReveal = f.revealMs;
     bdLocalStart = performance.now() - f.elapsedMs;
     plano = montarPlano(f);
-    bdImg = new Image(); bdImg.src = 'flags/' + f.code + '.svg';
+    bdImg = new Image();
+    bdImg.src = window.FLAG_SVG && FLAG_SVG[f.code] ? 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(FLAG_SVG[f.code]) : 'flags/' + f.code + '.svg';
     window.__bd = f;   // (depuração)
     $('bdOverlay').classList.remove('on');
   });
